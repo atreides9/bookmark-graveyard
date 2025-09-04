@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { Bookmark, Clock, Mail, Sparkles } from 'lucide-react'
+import { ReactNode } from 'react'
 import Link from 'next/link'
 
 export default function HomePage() {
@@ -83,7 +84,15 @@ export default function HomePage() {
   )
 }
 
-function FeatureCard({ icon, title, description }: any) {
+function FeatureCard({
+  icon,
+  title,
+  description,
+}: {
+  icon: ReactNode
+  title: string
+  description: string
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -98,7 +107,7 @@ function FeatureCard({ icon, title, description }: any) {
   )
 }
 
-function Step({ number, title }: any) {
+function Step({ number, title }: { number: string; title: string }) {
   return (
     <div className="flex items-center gap-4">
       <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center font-bold">

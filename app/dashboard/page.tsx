@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ExternalLink, RefreshCw, Search, Sparkles } from 'lucide-react'
+import Image from 'next/image'
+import { ExternalLink, Search, Sparkles } from 'lucide-react'
 
 interface Bookmark {
   id: string
@@ -88,7 +89,7 @@ export default function DashboardPage() {
             >
               <div className="flex items-start gap-3 mb-3">
                 {bookmark.favicon && (
-                  <img src={bookmark.favicon} alt="" className="w-5 h-5 mt-1" />
+                  <Image src={bookmark.favicon} alt="favicon" width={20} height={20} className="mt-1" />
                 )}
                 <div className="flex-1">
                   <h3 className="font-semibold line-clamp-2 mb-1">{bookmark.title}</h3>

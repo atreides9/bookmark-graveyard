@@ -11,7 +11,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!
 })
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     // 지난 주 묘지로 간 북마크들 조회
     const oneWeekAgo = new Date()
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     const summary = completion.choices[0].message.content
 
     // 요약 저장
-    const { data: summaryData, error: summaryError } = await supabase
+    const { data: _summaryData, error: summaryError } = await supabase
       .from('summaries')
       .insert({
         content: summary,
@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
       bookmarkCount: bookmarks.length 
     })
   } catch (error) {
+
     console.error('Error creating summary:', error)
     return NextResponse.json({ error: 'Failed to create summary' }, { status: 500 })
   }
