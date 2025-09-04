@@ -171,6 +171,120 @@
       font-size: 48px;
       margin-bottom: 10px;
     }
+
+    .bookmark-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .bookmark-meta {
+      font-size: 11px;
+      opacity: 0.7;
+      margin-top: 2px;
+    }
+
+    .bookmark-checkbox {
+      margin-left: 10px;
+    }
+
+    .btn-small {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .btn-settings {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 80%;
+      overflow-y: auto;
+      color: #333;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #999;
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 10px;
+      padding: 20px 24px;
+      border-top: 1px solid #eee;
+      justify-content: flex-end;
+    }
+
+    .setting-group {
+      margin-bottom: 24px;
+    }
+
+    .setting-group h4 {
+      margin-bottom: 8px;
+      color: #333;
+    }
+
+    .setting-desc {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 16px;
+    }
+
+    .setting-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      cursor: pointer;
+    }
+
+    .setting-item input[type="checkbox"] {
+      margin: 0;
+    }
   </style>
 </head>
 <body>
@@ -184,6 +298,6 @@
     <div class="loading">로딩중...</div>
   </div>
 
-  <script src="extension/popup.js"></script>
+  <script src="popup.js"></script>
 </body>
 </html>
