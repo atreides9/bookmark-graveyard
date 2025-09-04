@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "북마크 묘지 구조대",
+  "name": "북마크 구조대",
   "version": "1.0.0",
   "description": "30일 이상 방문하지 않은 북마크를 자동으로 정리합니다",
   "permissions": [
@@ -18,15 +18,11 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_icon": {
-      "16": "icon.png",
-      "48": "icon.png",
-      "128": "icon.png"
-    }
+    "default_title": "북마크 구조대"
   },
   "icons": {
     "16": "icon.png",
-    "48": "icon.png",
+    "48": "icon.png", 
     "128": "icon.png"
   }
 }

@@ -1,6 +1,6 @@
 // background.js - 오류 수정 완료 버전
 const API_URL = 'http://localhost:3000/api'
-const GRAVEYARD_FOLDER = '🪦 북마크 묘지'
+const RESCUE_QUEUE_FOLDER = '🚒 구조 대기실'
 
 // 검색엔진 도메인 목록
 const SEARCH_ENGINE_DOMAINS = [
@@ -14,15 +14,22 @@ const DEFAULT_SETTINGS = {
   week1: { enabled: false, days: 7, label: '1주일' },
   week2: { enabled: false, days: 14, label: '2주일' }, 
   week3: { enabled: false, days: 21, label: '3주일' },
-  week4: { enabled: false, days: 28, label: '4주일' },
+  month1: { enabled: false, days: 30, label: '1개월' },
+  month6: { enabled: false, days: 180, label: '6개월' },
+  year1: { enabled: false, days: 365, label: '1년' },
+  year3: { enabled: false, days: 1095, label: '3년' },
+  year3plus: { enabled: false, days: 9999, label: '3년 이상' },
   emailNotifications: false,
-  userEmail: ''
+  userEmail: '',
+  emailDays: [], // 알림 요일 배열 (0=일, 1=월, ..., 6=토)
+  emailTime: '09:00', // 알림 시간 (24시간 형식)
+  openaiApiKey: ''
 }
 
 // 초기화
 if (chrome.runtime && chrome.runtime.onInstalled) {
   chrome.runtime.onInstalled.addListener(() => {
-    console.log('북마크 묘지 구조대 설치 완료!')
+    console.log('북마크 구조대 설치 완료!')
     createGraveyardFolder()
     initializeSettings()
   })
@@ -97,7 +104,7 @@ async function scanBookmarks() {
     
     // 활성화된 기간별로 북마크 분류
     const periods = Object.entries(cleanupSettings).filter(([key, setting]) => 
-      key.startsWith('week') && setting.enabled
+      (key.startsWith('week') || key.startsWith('month') || key.startsWith('year')) && setting.enabled
     )
     
     if (periods.length === 0) {
@@ -113,6 +120,55 @@ async function scanBookmarks() {
       } catch {
         return false
       }
+    }
+
+    // 8가지 표준 카테고리 기반 북마크 자동 분류
+    function categorizeBookmark(bookmark) {
+      const title = bookmark.title.toLowerCase()
+      const url = bookmark.url.toLowerCase()
+      const text = `${title} ${url}`
+
+      // 1. Work/업무
+      if (/notion|slack|jira|confluence|trello|asana|zoom|teams|office|excel|word|powerpoint|google drive|dropbox|figma|adobe/.test(text)) {
+        return 'work'
+      }
+      
+      // 2. Reference/자료
+      if (/wikipedia|reference|wiki|docs|documentation|api|guide|manual|how-to|tips|tricks|백과|사전|매뉴얼|데이터베이스/.test(text)) {
+        return 'reference'
+      }
+      
+      // 3. Design/디자인
+      if (/behance|dribbble|pinterest|unsplash|icon|font|color|palette|photoshop|sketch|figma|디자인|아이콘|폰트|컬러/.test(text)) {
+        return 'design'
+      }
+      
+      // 4. News/뉴스·트렌드
+      if (/news|뉴스|신문|기사|blog|medium|techcrunch|경제|정치|사회|스포츠|연합뉴스|조선일보|중앙일보|동아일보|한겨레|매일경제|한국경제|cnn|bbc|reuters/.test(text)) {
+        return 'news'
+      }
+      
+      // 5. Entertainment/엔터테인먼트
+      if (/youtube|netflix|disney|spotify|music|movie|drama|game|entertainment|fun|웹툰|만화|게임|영화|드라마|음악/.test(text)) {
+        return 'entertainment'
+      }
+      
+      // 6. Shopping/구매
+      if (/amazon|ebay|쿠팡|11번가|g마켓|옥션|위메프|티몬|무신사|29cm|shop|store|buy|purchase|cart|order|product|쇼핑몰|가격비교|특가|중고장터/.test(text)) {
+        return 'shopping'
+      }
+      
+      // 7. Learning/교육·튜토리얼
+      if (/coursera|udemy|khan academy|edx|codecademy|freecodecamp|tutorial|learn|course|education|university|college|study|온라인강의|학습|튜토리얼|기술블로그/.test(text)) {
+        return 'learning'
+      }
+      
+      // 8. Social/커뮤니티·SNS
+      if (/facebook|twitter|instagram|reddit|discord|telegram|kakaotalk|naver cafe|clien|ruliweb|dcinside|inven|커뮤니티|포럼|sns|소셜/.test(text)) {
+        return 'social'
+      }
+      
+      return 'other'
     }
 
     async function checkBookmark(node) {
@@ -137,7 +193,9 @@ async function scanBookmarks() {
               ...node,
               period: setting.label,
               daysSinceAdded: Math.floor(daysSinceAdded),
-              daysSinceVisit: Math.floor(daysSinceVisit)
+              daysSinceVisit: Math.floor(daysSinceVisit),
+              dateAdded: dateAdded, // 저장일 정보 포함
+              category: categorizeBookmark(node) // 카테고리 분류 추가
             })
             break
           }
@@ -159,10 +217,6 @@ async function scanBookmarks() {
     // 발견된 북마크 처리
     if (bookmarksToProcess.length > 0) {
       console.log(`발견된 북마크: ${bookmarksToProcess.length}개`)
-      
-      // 배지 표시
-      chrome.action.setBadgeText({ text: bookmarksToProcess.length.toString() })
-      chrome.action.setBadgeBackgroundColor({ color: '#7c3aed' })
       
       // 처리 대상 목록을 저장 (팝업에서 사용)
       await chrome.storage.local.set({
@@ -356,7 +410,7 @@ function generateEmailContent(bookmarks) {
       </div>
       
       <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #9ca3af;">
-        <p>북마크 묘지 구조대가 전해드리는 알림입니다 🌟</p>
+        <p>북마크 구조대가 전해드리는 알림입니다 🌟</p>
         <p>이 메일이 불편하시면 언제든 설정에서 끌 수 있어요</p>
       </div>
     </div>
