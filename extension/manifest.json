@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "북마크 구조대",
+  "name": "북마크 보관소",
   "version": "1.0.0",
   "description": "30일 이상 방문하지 않은 북마크를 자동으로 정리합니다",
   "permissions": [
@@ -19,7 +19,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "북마크 구조대"
+    "default_title": "북마크 보관소"
   },
   "icons": {
     "16": "icon.png",

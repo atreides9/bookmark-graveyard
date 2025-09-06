@@ -125,7 +125,7 @@ class BookmarkManager {
       try {
         chrome.storage.local.get('pendingBookmarks', result => {
           if (chrome.runtime.lastError) {
-            console.error('대기 북마크 로드 오류:', chrome.runtime.lastError.message)
+            console.error('미사용 북마크 로드 오류:', chrome.runtime.lastError.message)
             this.showToast('북마크 데이터를 불러올 수 없습니다')
             resolve([])
             return
@@ -133,7 +133,7 @@ class BookmarkManager {
           resolve(result.pendingBookmarks || [])
         })
       } catch (error) {
-        console.error('대기 북마크 오류:', error)
+        console.error('미사용 북마크 오류:', error)
         this.showToast('북마크 데이터를 불러올 수 없습니다')
         resolve([])
       }
@@ -171,21 +171,29 @@ class BookmarkManager {
       <!-- Header -->
       <div class="header">
         <div class="header-left">
-          <h1 class="app-title">🚒 북마크 구조대 🧑‍🚒</h1>
+          <h1 class="app-title">📚 북마크 보관소 📋</h1>
         </div>
         <div class="header-right">
           <div class="stats" role="region" aria-label="북마크 통계">
             <div class="stat">
-              <div class="number" aria-label="구조된 북마크 ${this.formatCount(stats.graveyardCount)}개">${this.formatCount(stats.graveyardCount)}</div>
-              <div class="label">구조</div>
+              <div class="number" aria-label="보관된 북마크 ${this.formatCount(stats.graveyardCount)}개">${this.formatCount(stats.graveyardCount)}</div>
+              <div class="label">보관</div>
             </div>
             <div class="stat">
-              <div class="number" aria-label="대기 중인 북마크 ${this.state.bookmarks.length > 10 ? '10개 이상' : this.state.bookmarks.length + '개'}">${this.state.bookmarks.length > 10 ? '10+' : this.state.bookmarks.length}</div>
-              <div class="label">대기</div>
+              <div class="number" aria-label="미사용 북마크 ${this.state.bookmarks.length > 10 ? '10개 이상' : this.state.bookmarks.length + '개'}">${this.state.bookmarks.length > 10 ? '10+' : this.state.bookmarks.length}</div>
+              <div class="label">미사용</div>
             </div>
           </div>
           <button class="settings-btn" id="settingsBtn" aria-label="설정 열기" title="설정">⚙️</button>
         </div>
+      </div>
+
+      <!-- Scan Button - Prominent -->
+      <div class="scan-section">
+        <button class="scan-btn-prominent" id="scanBtn">
+          <span class="scan-icon">🔍</span>
+          <span id="scanText">오래된 북마크 찾기</span>
+        </button>
       </div>
 
       <!-- Content -->
@@ -202,15 +210,10 @@ class BookmarkManager {
       <div class="action-bar ${this.state.selected.size ? 'show' : ''}" id="actionBar">
         <span>${this.state.selected.size}개 선택</span>
         <div class="actions">
-          <button class="action keep" id="keepBtn" ${!this.state.selected.size ? 'disabled' : ''}>구조</button>
+          <button class="action keep" id="keepBtn" ${!this.state.selected.size ? 'disabled' : ''}>보관</button>
           <button class="action delete" id="deleteBtn" ${!this.state.selected.size ? 'disabled' : ''}>삭제</button>
         </div>
       </div>
-
-      <!-- Scan -->
-      <button class="scan-btn" id="scanBtn">
-        <span id="scanText">구조할 북마크 찾기</span>
-      </button>
     `
 
       // Cache new elements
@@ -249,6 +252,18 @@ class BookmarkManager {
 
   handleKeyDown(e) {
     const focusedElement = document.activeElement
+    
+    // 스페이스바나 엔터키로 체크박스 토글
+    if ((e.key === ' ' || e.key === 'Enter') && focusedElement.classList.contains('checkbox')) {
+      e.preventDefault()
+      const bookmark = focusedElement.closest('.bookmark')
+      if (bookmark) {
+        focusedElement.classList.add('checkbox-clicked')
+        setTimeout(() => focusedElement.classList.remove('checkbox-clicked'), 150)
+        this.toggleSelect(bookmark.dataset.id)
+      }
+      return
+    }
     
     // 스페이스바로 북마크 선택/해제
     if (e.key === ' ' && focusedElement.classList.contains('bookmark')) {
@@ -309,9 +324,9 @@ class BookmarkManager {
     } else if (target.id === 'scanBtn') {
       await this.scan()
     } else if (target.id === 'keepBtn') {
-      await this.bulkAction('keep')
+      await this.confirmAndExecute('keep')
     } else if (target.id === 'deleteBtn') {
-      await this.bulkAction('delete')
+      await this.confirmAndExecute('delete')
     } else if (target.classList.contains('visit-btn')) {
       chrome.tabs.create({ url: target.dataset.url })
     } else if (target.classList.contains('category-tile')) {
@@ -329,9 +344,14 @@ class BookmarkManager {
         this.sortBookmarks()
         await this.render()
       }
-    } else if (target.closest('.bookmark')) {
+    } else if (target.classList.contains('checkbox') || target.closest('.bookmark')) {
       const bookmark = target.closest('.bookmark')
       if (!target.classList.contains('visit-btn')) {
+        // Add visual feedback for checkbox clicks
+        if (target.classList.contains('checkbox')) {
+          target.classList.add('checkbox-clicked')
+          setTimeout(() => target.classList.remove('checkbox-clicked'), 150)
+        }
         this.toggleSelect(bookmark.dataset.id)
       }
     }
@@ -428,7 +448,11 @@ class BookmarkManager {
           }
           return `
             <div class="bookmark ${this.state.selected.has(bookmark.id) ? 'selected' : ''}" data-id="${bookmark.id}">
-              <div class="checkbox"></div>
+              <div class="checkbox" role="checkbox" 
+                   aria-checked="${this.state.selected.has(bookmark.id) ? 'true' : 'false'}" 
+                   aria-label="${bookmark.title} 선택" 
+                   tabindex="0">
+              </div>
               <img src="${faviconUrl}" class="favicon">
               <div class="info">
                 <div class="title">${bookmark.title || 'Untitled'}</div>
@@ -599,11 +623,11 @@ class BookmarkManager {
           <h2 class="milestone-title">축하합니다!</h2>
           <p class="milestone-message">
             당신은 우리의 생명의 은인이에요.<br>
-            구조되었으니 당신에게 많은 도움을 주고 싶어요!
+            보관되었으니 당신에게 많은 도움을 주고 싶어요!
           </p>
-          <div class="milestone-count">${count}개 북마크 구조 달성</div>
+          <div class="milestone-count">${count}개 북마크 보관 달성</div>
           <div class="milestone-actions">
-            <button class="milestone-btn primary" id="viewRescuedBtn">구조한 북마크 보러가기</button>
+            <button class="milestone-btn primary" id="viewRescuedBtn">보관한 북마크 보러가기</button>
             <button class="milestone-btn secondary" id="closeMilestoneBtn">닫기</button>
           </div>
         </div>
@@ -633,7 +657,7 @@ class BookmarkManager {
 
   async openRescuedBookmarksTab() {
     try {
-      // 구조된 북마크 폴더 찾기
+      // 보관된 북마크 폴더 찾기
       const { graveyardId } = await chrome.storage.local.get('graveyardId')
       if (graveyardId) {
         // Chrome 북마크 매니저에서 해당 폴더 열기
@@ -802,7 +826,11 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
             }
             return `
               <div class="bookmark ${this.state.selected.has(bookmark.id) ? 'selected' : ''}" data-id="${bookmark.id}">
-                <div class="checkbox"></div>
+                <div class="checkbox" role="checkbox" 
+                   aria-checked="${this.state.selected.has(bookmark.id) ? 'true' : 'false'}" 
+                   aria-label="${bookmark.title} 선택" 
+                   tabindex="0">
+              </div>
                 <img src="${faviconUrl}" class="favicon">
                 <div class="info">
                   <div class="title">${bookmark.title || 'Untitled'}</div>
@@ -868,7 +896,11 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
             }
             return `
               <div class="bookmark ${this.state.selected.has(bookmark.id) ? 'selected' : ''}" data-id="${bookmark.id}">
-                <div class="checkbox"></div>
+                <div class="checkbox" role="checkbox" 
+                   aria-checked="${this.state.selected.has(bookmark.id) ? 'true' : 'false'}" 
+                   aria-label="${bookmark.title} 선택" 
+                   tabindex="0">
+              </div>
                 <img src="${faviconUrl}" class="favicon">
                 <div class="info">
                   <div class="title">${bookmark.title || 'Untitled'}</div>
@@ -967,6 +999,77 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
     }
   }
 
+  async confirmAndExecute(action) {
+    const selectedIds = Array.from(this.state.selected)
+    if (!selectedIds.length) return
+
+    const actionText = action === 'keep' ? '보관' : '삭제'
+    const message = action === 'keep' 
+      ? `선택된 ${selectedIds.length}개의 북마크를 보관하시겠습니까?\n\n보관된 북마크는 "📋 보관된 북마크" 폴더로 복사되며, 원본은 그대로 유지됩니다.`
+      : `선택된 ${selectedIds.length}개의 북마크를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`
+
+    const confirmed = await this.showConfirmDialog(message, actionText)
+    if (confirmed) {
+      await this.bulkAction(action)
+    }
+  }
+
+  async showConfirmDialog(message, actionText) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div')
+      overlay.className = 'modal'
+      overlay.innerHTML = `
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>확인</h3>
+            <button class="close" id="confirmClose">×</button>
+          </div>
+          <div class="modal-body">
+            <p style="white-space: pre-line; line-height: 1.5;">${message}</p>
+          </div>
+          <div class="modal-footer">
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary" id="confirmCancel" style="flex: 1;">취소</button>
+              <button class="btn btn-primary" id="confirmAction" style="flex: 1;">${actionText}</button>
+            </div>
+          </div>
+        </div>
+      `
+
+      document.body.appendChild(overlay)
+
+      // 이벤트 리스너
+      const handleClick = (e) => {
+        if (e.target.id === 'confirmAction') {
+          cleanup()
+          resolve(true)
+        } else if (e.target.id === 'confirmCancel' || e.target.id === 'confirmClose' || e.target === overlay) {
+          cleanup()
+          resolve(false)
+        }
+      }
+
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          cleanup()
+          resolve(false)
+        } else if (e.key === 'Enter') {
+          cleanup()
+          resolve(true)
+        }
+      }
+
+      const cleanup = () => {
+        overlay.removeEventListener('click', handleClick)
+        document.removeEventListener('keydown', handleKeyDown)
+        overlay.remove()
+      }
+
+      overlay.addEventListener('click', handleClick)
+      document.addEventListener('keydown', handleKeyDown)
+    })
+  }
+
   async bulkAction(action) {
     const selectedIds = Array.from(this.state.selected)
     if (!selectedIds.length) return
@@ -1011,7 +1114,7 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
     
     // 전체 렌더링 강제 (카테고리가 변경될 수 있으므로)
     await this.render(true)
-    this.showToast(`${selectedIds.length}개 ${action === 'keep' ? '구조' : '삭제'}`)
+    this.showToast(`${selectedIds.length}개 ${action === 'keep' ? '보관' : '삭제'}`)
   }
 
 

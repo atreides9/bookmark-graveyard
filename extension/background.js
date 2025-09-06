@@ -1,6 +1,6 @@
 // background.js - 코드 최적화 버전
 
-const GRAVEYARD_FOLDER = '🔖 구조된 북마크'
+const GRAVEYARD_FOLDER = '📋 보관된 북마크'
 
 // 검색엔진 도메인 목록
 const SEARCH_ENGINE_DOMAINS = [
@@ -22,7 +22,7 @@ const DEFAULT_SETTINGS = {
 // 초기화
 if (chrome.runtime && chrome.runtime.onInstalled) {
   chrome.runtime.onInstalled.addListener(() => {
-    console.log('북마크 구조대 설치 완료!')
+    console.log('북마크 보관소 설치 완료!')
     createGraveyardFolder()
     initializeSettings()
     setupPeriodicFolderCheck()

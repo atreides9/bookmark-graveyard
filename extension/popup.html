@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>🚒북마크 구조대🧑‍🚒</title>
+  <title>📚북마크 보관소📋</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="사용하지 않는 북마크를 정리하고 관리하는 브라우저 확장 프로그램">
   <style>
@@ -99,8 +99,124 @@
         background: #000000;
         color: #ffffff;
       }
+      
+      .header {
+        background: #000000;
+        border-bottom: 2px solid #ffffff;
+      }
+      
+      .scan-section {
+        background: #000000;
+        border-bottom: 2px solid #ffffff;
+      }
+      
+      .scan-btn-prominent {
+        background: #ffffff;
+        color: #000000;
+        border: 2px solid #ffffff;
+        box-shadow: none;
+      }
+      
+      .scan-btn-prominent:hover {
+        background: #000000;
+        color: #ffffff;
+        border: 2px solid #ffffff;
+        transform: none;
+        box-shadow: none;
+      }
+      
       .bookmark {
+        background: #000000;
+        border: 2px solid #ffffff;
+        margin-bottom: 2px;
+      }
+      
+      .bookmark:hover, .bookmark:focus {
+        background: #ffffff;
+        color: #000000;
+      }
+      
+      .bookmark.selected {
+        background: #ffffff;
+        color: #000000;
+        border: 2px solid #ffffff;
+      }
+      
+      .checkbox {
+        border: 2px solid #ffffff;
+        background: transparent;
+      }
+      
+      .checkbox:hover, .checkbox:focus {
+        border: 2px solid #ffffff;
+        background: #ffffff;
+      }
+      
+      .bookmark.selected .checkbox {
+        border: 2px solid #000000;
+        background: #000000;
+      }
+      
+      .category-tile {
+        background: #000000;
+        border: 2px solid #ffffff;
+        color: #ffffff;
+      }
+      
+      .category-tile:hover {
+        background: #ffffff;
+        color: #000000;
+        transform: none;
+        box-shadow: none;
+      }
+      
+      .action-bar {
+        background: #000000;
+        border-top: 2px solid #ffffff;
+      }
+      
+      .action.keep {
+        background: #ffffff;
+        color: #000000;
+        border: 2px solid #ffffff;
+      }
+      
+      .action.delete {
+        background: #000000;
+        color: #ffffff;
+        border: 2px solid #ffffff;
+      }
+      
+      .modal-content {
+        background: #000000;
+        border: 2px solid #ffffff;
+      }
+      
+      .modal-header, .modal-footer {
+        background: #000000;
+        border-color: #ffffff;
+      }
+      
+      .btn-primary {
+        background: #ffffff;
+        color: #000000;
+        border: 2px solid #ffffff;
+      }
+      
+      .btn-secondary {
+        background: #000000;
+        color: #ffffff;
+        border: 2px solid #ffffff;
+      }
+      
+      .settings-btn {
+        color: #ffffff;
         border: 1px solid #ffffff;
+      }
+      
+      .settings-btn:hover {
+        background: #ffffff;
+        color: #000000;
       }
     }
 
@@ -458,6 +574,32 @@
       position: relative;
       flex-shrink: 0;
       transition: all 0.2s;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .checkbox:hover {
+      border-color: #007aff;
+      background: rgba(0, 122, 255, 0.1);
+      transform: scale(1.1);
+    }
+    
+    .checkbox:focus {
+      border-color: #007aff;
+      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3);
+      outline: none;
+    }
+    
+    .checkbox-clicked {
+      animation: checkboxPulse 0.15s ease-out;
+    }
+    
+    @keyframes checkboxPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
     }
     
     .bookmark.selected .checkbox {
@@ -632,7 +774,52 @@
       color: white;
     }
     
-    /* Scan button */
+    /* Scan section */
+    .scan-section {
+      padding: 16px 28px;
+      border-bottom: 1px solid #2c2c2e;
+      background: #1c1c1e;
+    }
+
+    .scan-btn-prominent {
+      width: 100%;
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #007aff, #5856d6);
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3);
+    }
+    
+    .scan-btn-prominent:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 122, 255, 0.4);
+      background: linear-gradient(135deg, #0051d5, #4c44c7);
+    }
+    
+    .scan-btn-prominent:active {
+      transform: translateY(0);
+    }
+    
+    .scan-btn-prominent:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .scan-icon {
+      font-size: 18px;
+    }
+
+    /* Legacy scan button (keeping for compatibility) */
     .scan-btn {
       width: calc(100% - 56px);
       margin: 4px 28px 16px;
