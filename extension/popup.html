@@ -2,342 +2,89 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>📚북마크 보관소📋</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="사용하지 않는 북마크를 정리하고 관리하는 브라우저 확장 프로그램">
+  <title>🚒북마크 구조대🧑‍🚒</title>
   <style>
-    /* Reset */
+    /* Apple-style minimal design - function first */
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
-
+    
     body {
-      min-width: 420px;
-      max-width: 600px;
-      width: 520px;
-      min-height: 400px;
-      max-height: 700px;
-      height: 600px;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
-      background: #000000;
+      width: 380px;
+      height: 650px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d0d0d;
       color: #ffffff;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
     }
-
-    /* 반응형 디자인 */
-    @media (max-width: 450px) {
-      body {
-        width: 420px;
-        padding: 0 4px;
-      }
-      
-      .header {
-        padding: 8px 20px;
-      }
-      
-      .content {
-        padding: 12px 20px 16px;
-      }
-      
-      .category-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-      }
-    }
-
-    @media (min-width: 550px) {
-      body {
-        width: 580px;
-      }
-      
-      .content {
-        padding: 20px 32px 24px;
-      }
-      
-      .category-grid {
-        grid-template-columns: repeat(3, 1fr);
-      }
-      
-      .header {
-        padding: 14px 28px;
-      }
-    }
-
-    @media (max-height: 500px) {
-      body {
-        height: 450px;
-      }
-      
-      .content {
-        padding: 12px 20px 16px;
-      }
-      
-      .category-tile {
-        min-height: 80px;
-        padding: 12px;
-      }
-    }
-
-    @media (min-height: 650px) {
-      body {
-        height: 650px;
-      }
-    }
-
-    /* 접근성: 포커스 스타일 */
-    *:focus {
-      outline: 2px solid #007aff;
-      outline-offset: 2px;
-    }
-
-    /* 고대비 모드 지원 */
-    @media (prefers-contrast: high) {
-      body {
-        background: #000000;
-        color: #ffffff;
-      }
-      
-      .header {
-        background: #000000;
-        border-bottom: 2px solid #ffffff;
-      }
-      
-      .scan-section {
-        background: #000000;
-        border-bottom: 2px solid #ffffff;
-      }
-      
-      .scan-btn-prominent {
-        background: #ffffff;
-        color: #000000;
-        border: 2px solid #ffffff;
-        box-shadow: none;
-      }
-      
-      .scan-btn-prominent:hover {
-        background: #000000;
-        color: #ffffff;
-        border: 2px solid #ffffff;
-        transform: none;
-        box-shadow: none;
-      }
-      
-      .bookmark {
-        background: #000000;
-        border: 2px solid #ffffff;
-        margin-bottom: 2px;
-      }
-      
-      .bookmark:hover, .bookmark:focus {
-        background: #ffffff;
-        color: #000000;
-      }
-      
-      .bookmark.selected {
-        background: #ffffff;
-        color: #000000;
-        border: 2px solid #ffffff;
-      }
-      
-      .checkbox {
-        border: 2px solid #ffffff;
-        background: transparent;
-      }
-      
-      .checkbox:hover, .checkbox:focus {
-        border: 2px solid #ffffff;
-        background: #ffffff;
-      }
-      
-      .bookmark.selected .checkbox {
-        border: 2px solid #000000;
-        background: #000000;
-      }
-      
-      .category-tile {
-        background: #000000;
-        border: 2px solid #ffffff;
-        color: #ffffff;
-      }
-      
-      .category-tile:hover {
-        background: #ffffff;
-        color: #000000;
-        transform: none;
-        box-shadow: none;
-      }
-      
-      .action-bar {
-        background: #000000;
-        border-top: 2px solid #ffffff;
-      }
-      
-      .action.keep {
-        background: #ffffff;
-        color: #000000;
-        border: 2px solid #ffffff;
-      }
-      
-      .action.delete {
-        background: #000000;
-        color: #ffffff;
-        border: 2px solid #ffffff;
-      }
-      
-      .modal-content {
-        background: #000000;
-        border: 2px solid #ffffff;
-      }
-      
-      .modal-header, .modal-footer {
-        background: #000000;
-        border-color: #ffffff;
-      }
-      
-      .btn-primary {
-        background: #ffffff;
-        color: #000000;
-        border: 2px solid #ffffff;
-      }
-      
-      .btn-secondary {
-        background: #000000;
-        color: #ffffff;
-        border: 2px solid #ffffff;
-      }
-      
-      .settings-btn {
-        color: #ffffff;
-        border: 1px solid #ffffff;
-      }
-      
-      .settings-btn:hover {
-        background: #ffffff;
-        color: #000000;
-      }
-    }
-
-    /* 동작 줄임 선호 지원 */
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-      }
-    }
-
-    /* 스크린 리더 전용 텍스트 */
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
-
+    
     /* Header */
     .header {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding: 12px 28px;
-      background: #1c1c1e;
+      justify-content: space-between;
+      padding: 16px 20px 12px;
       border-bottom: 1px solid #2c2c2e;
       flex-shrink: 0;
     }
 
     .header-left {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 16px;
+      flex: 1;
     }
 
     .app-title {
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 700;
       color: #ffffff;
       margin: 0;
     }
-
+    
+    .settings-btn {
+      background: #1c1c1e;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 16px;
+      cursor: pointer;
+      font-size: 16px;
+      color: #ffffff;
+    }
+    
+    .settings-btn:hover {
+      background: #2c2c2e;
+    }
+    
     .stats {
       display: flex;
-      align-items: center;
-      gap: 16px;
+      gap: 24px;
+      margin-right: 16px;
     }
-
+    
     .stat {
       text-align: center;
     }
-
-    .stat .number {
-      font-size: 18px;
-      font-weight: 700;
-      color: #ffffff;
+    
+    .number {
+      font-size: 24px;
+      font-weight: 600;
+      color: #007aff;
     }
 
-    .stat .label {
-      font-size: 11px;
-      font-weight: 500;
+    
+    .label {
+      font-size: 13px;
       color: #98989d;
       margin-top: 2px;
     }
-
-    .settings-btn {
-      background: none;
-      border: none;
-      font-size: 18px;
-      cursor: pointer;
-      padding: 4px;
-      border-radius: 6px;
-      transition: background-color 0.2s;
-      color: #007aff;
-      font-weight: 600;
-    }
-
-    .settings-btn:hover, .settings-btn:focus {
-      background: #2c2c2e;
-    }
-
-    .settings-btn:focus {
-      outline: 2px solid #007aff;
-      outline-offset: 1px;
-    }
-
-    /* Scrollbar */
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.3);
-      border-radius: 3px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.5);
-    }
-
+    
     /* Content */
     .content {
       flex: 1;
-      padding: 16px 28px 20px;
+      padding: 16px 20px 20px;
       overflow-y: auto;
       min-height: 0;
     }
@@ -406,7 +153,6 @@
       padding: 6px 10px;
       font-size: 13px;
       cursor: pointer;
-      outline: none;
     }
 
     .sort-toggle {
@@ -414,25 +160,19 @@
       border: 1px solid #2c2c2e;
       border-radius: 6px;
       color: #ffffff;
-      padding: 6px 10px;
-      font-size: 14px;
-      font-weight: 500;
+      width: 28px;
+      height: 28px;
       cursor: pointer;
-      transition: all 0.2s;
-      min-width: 32px;
+      font-size: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: all 0.2s;
     }
 
     .sort-toggle:hover {
       background: #2c2c2e;
       color: #007aff;
-      transform: translateY(-1px);
-    }
-
-    .sort-toggle:active {
-      transform: translateY(0);
     }
 
     .select-all-btn {
@@ -444,12 +184,13 @@
       font-size: 13px;
       font-weight: 500;
       cursor: pointer;
-      transition: background-color 0.2s;
+      transition: all 0.2s;
     }
 
     .select-all-btn:hover {
       background: #2c2c2e;
     }
+
     .back-btn {
       background: #1c1c1e;
       border: 1px solid #2c2c2e;
@@ -460,9 +201,11 @@
       cursor: pointer;
       font-weight: 500;
     }
+
     .back-btn:hover {
       background: #2c2c2e;
     }
+
     /* Category tiles */
     .category-grid {
       display: grid;
@@ -475,14 +218,12 @@
       background: #1c1c1e;
       border: 1px solid #2c2c2e;
       border-radius: 12px;
-      padding: 16px;
+      padding: 16px 12px;
+      text-align: center;
       cursor: pointer;
       transition: all 0.2s;
-      text-align: center;
-      min-height: 100px;
       display: flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
       gap: 8px;
     }
@@ -523,12 +264,11 @@
     .bookmark {
       display: flex;
       align-items: center;
-      gap: 14px;
-      padding: 12px 20px;
+      gap: 12px;
+      padding: 12px 16px;
       background: #1c1c1e;
       cursor: pointer;
       transition: background-color 0.2s;
-      border: 2px solid transparent;
     }
     
     .bookmark:first-child {
@@ -546,20 +286,10 @@
     .bookmark:hover {
       background: #2c2c2e;
     }
-
-    .bookmark:focus {
-      background: #2c2c2e;
-      border-color: #007aff;
-      outline: none;
-    }
     
     .bookmark.selected {
       background: #5856d6;
       color: white;
-    }
-
-    .bookmark.selected:focus {
-      border-color: #ffffff;
     }
     
     .bookmark.selected .meta {
@@ -569,37 +299,10 @@
     .checkbox {
       width: 18px;
       height: 18px;
-      border: 2px solid #2c2c2e;
-      border-radius: 4px;
+      border: 2px solid #48484a;
+      border-radius: 9px;
       position: relative;
       flex-shrink: 0;
-      transition: all 0.2s;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    
-    .checkbox:hover {
-      border-color: #007aff;
-      background: rgba(0, 122, 255, 0.1);
-      transform: scale(1.1);
-    }
-    
-    .checkbox:focus {
-      border-color: #007aff;
-      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3);
-      outline: none;
-    }
-    
-    .checkbox-clicked {
-      animation: checkboxPulse 0.15s ease-out;
-    }
-    
-    @keyframes checkboxPulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.2); }
-      100% { transform: scale(1); }
     }
     
     .bookmark.selected .checkbox {
@@ -630,41 +333,32 @@
     }
     
     .title {
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 500;
-      color: inherit;
+      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
       margin-bottom: 2px;
     }
     
     .meta {
-      font-size: 11px;
+      font-size: 13px;
       color: #98989d;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      line-height: 1.3;
-      flex-wrap: nowrap;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
     
     .visit-btn {
-      background: none;
+      background: transparent;
       border: none;
-      color: #007aff;
-      font-size: 16px;
+      color: #98989d;
+      font-size: 18px;
       cursor: pointer;
       padding: 4px;
+      border-radius: 4px;
       flex-shrink: 0;
-      transition: color 0.2s;
     }
     
     .visit-btn:hover {
-      color: #0051d5;
+      background: rgba(255, 255, 255, 0.1);
     }
     
     .bookmark.selected .visit-btn {
@@ -681,7 +375,7 @@
       color: #007aff;
       font-size: 15px;
       cursor: pointer;
-      margin-bottom: 4px;
+      margin-bottom: 12px;
     }
     
     .load-more:hover {
@@ -695,27 +389,28 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      text-align: center;
+      gap: 8px;
       padding: 40px 20px;
-      gap: 16px;
     }
     
     .empty .icon {
-      font-size: 48px;
-      opacity: 0.8;
+      font-size: 64px;
+      color: #34c759;
+      margin-bottom: 8px;
     }
     
     .empty .title {
-      font-size: 20px;
+      font-size: 24px;
       font-weight: 600;
       color: #ffffff;
-      margin: 0;
+      margin-bottom: 4px;
     }
     
     .empty .text {
-      font-size: 14px;
+      font-size: 16px;
       color: #98989d;
-      max-width: 280px;
+      text-align: center;
+      margin-bottom: 8px;
     }
     
     .empty .encouragement {
@@ -752,16 +447,10 @@
     .action {
       padding: 8px 16px;
       border: none;
-      border-radius: 8px;
-      font-size: 14px;
+      border-radius: 20px;
+      font-size: 15px;
       font-weight: 500;
       cursor: pointer;
-      transition: opacity 0.2s;
-    }
-    
-    .action:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
     }
     
     .action.keep {
@@ -774,55 +463,15 @@
       color: white;
     }
     
-    /* Scan section */
-    .scan-section {
-      padding: 16px 28px;
-      border-bottom: 1px solid #2c2c2e;
-      background: #1c1c1e;
-    }
-
-    .scan-btn-prominent {
-      width: 100%;
-      padding: 16px 20px;
-      background: linear-gradient(135deg, #007aff, #5856d6);
-      color: white;
-      border: none;
-      border-radius: 16px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3);
-    }
-    
-    .scan-btn-prominent:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(0, 122, 255, 0.4);
-      background: linear-gradient(135deg, #0051d5, #4c44c7);
-    }
-    
-    .scan-btn-prominent:active {
-      transform: translateY(0);
-    }
-    
-    .scan-btn-prominent:disabled {
-      opacity: 0.6;
+    .action:disabled {
+      opacity: 0.3;
       cursor: not-allowed;
-      transform: none;
     }
-
-    .scan-icon {
-      font-size: 18px;
-    }
-
-    /* Legacy scan button (keeping for compatibility) */
+    
+    /* Scan button */
     .scan-btn {
-      width: calc(100% - 56px);
-      margin: 4px 28px 16px;
+      width: calc(100% - 40px);
+      margin: 8px 20px 16px;
       padding: 14px;
       background: #007aff;
       color: white;
@@ -850,265 +499,88 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.6);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 1000;
     }
-
+    
     .modal-content {
       background: #1c1c1e;
-      border-radius: 16px;
-      padding: 0;
-      width: 360px;
-      max-width: 95%;
-      max-height: 80vh;
-      border: 1px solid #2c2c2e;
+      border-radius: 12px;
+      width: 320px;
+      max-height: 400px;
       overflow: hidden;
-      display: flex;
-      flex-direction: column;
     }
-
+    
     .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #2c2c2e;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 20px 24px;
-      border-bottom: 1px solid #2c2c2e;
-      background: #1c1c1e;
     }
-
+    
     .modal-header h3 {
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 600;
-      margin: 0;
       color: #ffffff;
     }
-
-    .modal-header .close {
+    
+    .close {
       background: none;
       border: none;
-      color: #98989d;
       font-size: 24px;
+      color: #98989d;
       cursor: pointer;
-      padding: 4px;
-      line-height: 1;
     }
-
-    .modal-header .close:hover {
-      color: #ffffff;
-    }
-
+    
     .modal-body {
-      flex: 1;
-      padding: 24px;
+      padding: 20px;
+      max-height: 280px;
       overflow-y: auto;
     }
-
-    .modal-footer {
-      padding: 16px 24px;
-      border-top: 1px solid #2c2c2e;
-      background: #1c1c1e;
-    }
-
-    .modal-footer button {
-      width: 100%;
-      padding: 12px;
-      background: #007aff;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .modal-footer button:hover {
-      background: #0051d5;
-    }
-
-    .modal h3 {
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 8px;
-      color: #ffffff;
-    }
-
-    .modal p {
-      color: #98989d;
-      font-size: 14px;
-      line-height: 1.4;
-      margin-bottom: 20px;
-    }
-
-    /* Settings styles */
+    
     .setting {
-      margin-bottom: 32px;
+      margin-bottom: 60px;
     }
-
+    
+    .setting:last-child {
+      margin-bottom: 0;
+    }
+    
     .setting h4 {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
-      margin-bottom: 16px;
-      color: #ffffff;
-    }
-
-    .setting h5 {
-      font-size: 14px;
-      font-weight: 500;
       margin-bottom: 12px;
-      margin-top: 16px;
       color: #ffffff;
     }
-
+    
     .setting label {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 12px;
-      font-size: 14px;
-      color: #ffffff;
+      padding: 8px 0;
       cursor: pointer;
+      color: #ffffff;
     }
-
+    
     .setting input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      accent-color: #007aff;
+      width: 16px;
+      height: 16px;
     }
-
-    .setting input[type="email"],
+    
+    .setting input[type="email"], 
     .setting input[type="password"] {
       width: 100%;
-      padding: 12px;
-      background: #2c2c2e;
-      border: 1px solid #3a3a3c;
-      border-radius: 8px;
-      color: #ffffff;
-      font-size: 14px;
-      outline: none;
-      margin-bottom: 8px;
-    }
-
-    .setting input[type="email"]:focus,
-    .setting input[type="password"]:focus {
-      border-color: #007aff;
-    }
-
-    .period-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .period-option {
-      background: #2c2c2e;
-      border: 1px solid #3a3a3c;
-      border-radius: 12px;
-      padding: 16px 12px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .period-option:hover {
-      background: #3a3a3c;
-      transform: translateY(-1px);
-    }
-
-    .period-option.selected {
-      background: #007aff;
-      border-color: #007aff;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
-    }
-
-    .period-label {
-      font-size: 14px;
-      font-weight: 600;
-      color: #ffffff;
-      margin-bottom: 4px;
-    }
-
-    .period-range {
-      font-size: 12px;
-      color: #98989d;
-    }
-
-    .period-option.selected .period-range {
-      color: rgba(255, 255, 255, 0.8);
-    }
-
-    .period-summary {
-      font-size: 13px;
-      color: #007aff;
-      text-align: center;
-      padding: 12px;
-      background: rgba(0, 122, 255, 0.1);
-      border-radius: 8px;
-      margin-bottom: 16px;
-    }
-
-    .days-selector {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-bottom: 16px;
-    }
-
-    .day-btn {
-      background: #2c2c2e;
-      border: 1px solid #3a3a3c;
-      border-radius: 8px;
       padding: 8px 12px;
-      font-size: 13px;
-      color: #ffffff;
-      cursor: pointer;
-      transition: all 0.2s;
-      min-width: 40px;
-      text-align: center;
-    }
-
-    .day-btn:hover {
-      background: #3a3a3c;
-    }
-
-    .day-btn.selected {
-      background: #007aff;
-      border-color: #007aff;
-      color: #ffffff;
-      transform: scale(1.05);
-      box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
-    }
-
-    .time-presets {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .time-preset {
-      background: #2c2c2e;
-      border: 1px solid #3a3a3c;
+      border: 1px solid #2c2c2e;
       border-radius: 8px;
-      padding: 8px 16px;
-      font-size: 13px;
+      margin-top: 8px;
+      font-size: 15px;
+      background: #0d0d0d;
       color: #ffffff;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .time-preset:hover {
-      background: #3a3a3c;
-    }
-
-    .time-preset.selected {
-      background: #007aff;
-      border-color: #007aff;
-      color: #ffffff;
-      transform: scale(1.02);
     }
 
     .email-days-section {
@@ -1125,210 +597,42 @@
 
     .email-days-section.visible {
       opacity: 1;
-      max-height: 500px;
+      max-height: 200px;
     }
 
-    /* Settings */
-    .settings {
-      padding: 20px;
-      max-height: 500px;
-      overflow-y: auto;
-    }
-
-    .settings h3 {
-      font-size: 16px;
+    .email-days-section h5 {
+      font-size: 14px;
       font-weight: 600;
-      margin-bottom: 16px;
       color: #ffffff;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .settings-section {
-      margin-bottom: 32px;
-    }
-
-    .setting-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 0;
-      border-bottom: 1px solid #2c2c2e;
-    }
-
-    .setting-item:last-child {
-      border-bottom: none;
-    }
-
-    .setting-label {
-      font-size: 14px;
-      color: #ffffff;
-      font-weight: 500;
-    }
-
-    .setting-description {
-      font-size: 12px;
-      color: #98989d;
-      margin-top: 2px;
-    }
-
-    .toggle {
-      position: relative;
-      width: 44px;
-      height: 24px;
-      background: #2c2c2e;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-
-    .toggle.active {
-      background: #007aff;
-    }
-
-    .toggle-slider {
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 20px;
-      height: 20px;
-      background: white;
-      border-radius: 50%;
-      transition: transform 0.3s;
-    }
-
-    .toggle.active .toggle-slider {
-      transform: translateX(20px);
-    }
-
-    .input-group {
-      margin-bottom: 16px;
-    }
-
-    .input-group label {
-      display: block;
-      margin-bottom: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      color: #ffffff;
-    }
-
-    .input-group input, .input-group select {
-      width: 100%;
-      padding: 8px 12px;
-      background: #2c2c2e;
-      border: 1px solid #3a3a3c;
-      border-radius: 8px;
-      color: #ffffff;
-      font-size: 14px;
-      outline: none;
-    }
-
-    .input-group input:focus, .input-group select:focus {
-      border-color: #007aff;
-    }
-
-    .button-group {
-      display: flex;
-      gap: 8px;
-      margin-top: 16px;
-    }
-
-    .btn {
-      flex: 1;
-      padding: 10px 16px;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-
-    .btn-primary {
-      background: #007aff;
-      color: white;
-    }
-
-    .btn-secondary {
-      background: #2c2c2e;
-      color: #ffffff;
-    }
-
-    .btn:hover {
-      opacity: 0.8;
-    }
-
-    /* Period selection */
-    .period-selection {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-
-    .period-option {
-      background: #1c1c1e;
-      border: 1px solid #2c2c2e;
-      border-radius: 8px;
-      padding: 12px 8px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-size: 12px;
-      color: #ffffff;
-    }
-
-    .period-option:hover {
-      background: #2c2c2e;
-      transform: translateY(-1px);
-    }
-
-    .period-option.selected {
-      background: #007aff;
-      border-color: #007aff;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
-    }
-
-    .period-title {
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-
-    .period-description {
-      color: #98989d;
-      font-size: 11px;
-    }
-
-    .period-option.selected .period-description {
-      color: rgba(255, 255, 255, 0.8);
-    }
-
-    /* Email settings */
-    .day-selection {
-      display: flex;
-      gap: 4px;
-      flex-wrap: wrap;
       margin-bottom: 12px;
     }
 
+    .days-selector {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
+
     .day-btn {
-      background: #2c2c2e;
-      border: 1px solid #3a3a3c;
-      border-radius: 6px;
-      padding: 6px 8px;
-      font-size: 12px;
-      color: #ffffff;
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      border-radius: 12px;
+      color: #98989d;
+      padding: 10px 0;
+      font-size: 13px;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
-      min-width: 32px;
+      transition: all 0.2s ease;
       text-align: center;
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .day-btn:hover {
-      background: #3a3a3c;
+      background: #2c2c2e;
+      border-color: #3a3a3c;
     }
 
     .day-btn.selected {
@@ -1339,26 +643,119 @@
       box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
     }
 
-    .time-presets {
-      display: flex;
+    .day-btn.selected:hover {
+      background: #0056cc;
+      border-color: #0056cc;
+    }
+
+    /* Airbnb-style Time Period Selector */
+    .time-period-selector {
+      margin-top: 16px;
+    }
+
+    .period-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
       gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .period-option {
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      border-radius: 12px;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .period-option:hover {
+      background: #2c2c2e;
+      border-color: #3a3a3c;
+      transform: translateY(-1px);
+    }
+
+    .period-option.selected {
+      background: #007aff;
+      border-color: #007aff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+    }
+
+    .period-option.selected:hover {
+      background: #0056cc;
+      border-color: #0056cc;
+    }
+
+    .period-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .period-option.selected .period-label {
+      color: #ffffff;
+    }
+
+    .period-range {
+      font-size: 12px;
+      color: #98989d;
+      font-weight: 400;
+    }
+
+    .period-option.selected .period-range {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .period-summary {
+      background: #2c2c2e;
+      border: 1px solid #3a3a3c;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #98989d;
+      text-align: center;
+      font-weight: 500;
+    }
+
+    /* Time Selector */
+    .time-selector-section {
+      margin-top: 20px;
+    }
+
+    .time-selector-section h5 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffffff;
       margin-bottom: 12px;
-      flex-wrap: wrap;
+    }
+
+    .time-presets {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
     }
 
     .time-preset {
-      background: #2c2c2e;
-      border: 1px solid #3a3a3c;
-      border-radius: 6px;
-      padding: 6px 12px;
-      font-size: 12px;
-      color: #ffffff;
+      background: #1c1c1e;
+      border: 1px solid #2c2c2e;
+      border-radius: 8px;
+      color: #98989d;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 500;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.2s ease;
+      text-align: center;
     }
 
     .time-preset:hover {
-      background: #3a3a3c;
+      background: #2c2c2e;
+      border-color: #3a3a3c;
     }
 
     .time-preset.selected {
@@ -1368,129 +765,171 @@
       transform: scale(1.02);
     }
 
-    .save-btn {
-      width: 100%;
-      padding: 12px;
-      margin-top: 16px;
-      background: #34c759;
+    .time-preset.selected:hover {
+      background: #0056cc;
+      border-color: #0056cc;
+    }
+    
+    .modal-footer {
+      padding: 16px 20px;
+      border-top: 1px solid #2c2c2e;
+      text-align: right;
+    }
+    
+    .modal-footer button {
+      padding: 8px 24px;
+      background: #007aff;
       color: white;
       border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
+      border-radius: 20px;
+      font-size: 15px;
+      font-weight: 500;
       cursor: pointer;
-      transition: background-color 0.2s;
     }
-
-    .save-btn:hover {
-      background: #2d5a41;
-    }
-
-    .save-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
+    
     /* Toast */
     .toast {
       position: fixed;
-      bottom: 100px;
+      top: 20px;
       left: 50%;
-      transform: translateX(-50%);
-      background: #1c1c1e;
-      color: #ffffff;
-      padding: 12px 24px;
-      border-radius: 24px;
-      font-size: 14px;
-      font-weight: 500;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-      border: 1px solid #2c2c2e;
-      z-index: 1001;
-      opacity: 0;
-      animation: toastShow 0.3s forwards, toastHide 0.3s 2s forwards;
-    }
-
-    @keyframes toastShow {
-      from {
-        opacity: 0;
-        transform: translateX(-50%) translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-    }
-
-    @keyframes toastHide {
-      from {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-      to {
-        opacity: 0;
-        transform: translateX(-50%) translateY(20px);
-      }
-    }
-
-    /* Milestone popup */
-    .milestone-popup {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: linear-gradient(135deg, #007aff, #5856d6);
-      color: white;
-      padding: 32px 24px;
-      border-radius: 20px;
-      text-align: center;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-      z-index: 1002;
-      min-width: 280px;
-      animation: milestoneShow 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-
-    @keyframes milestoneShow {
-      from {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0.5);
-      }
-      to {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-      }
-    }
-
-    .milestone-popup h3 {
-      font-size: 24px;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-
-    .milestone-popup p {
-      font-size: 16px;
-      opacity: 0.9;
-      margin-bottom: 16px;
-    }
-
-    .milestone-popup .emoji {
-      font-size: 48px;
-      margin-bottom: 16px;
-      display: block;
-    }
-
-    .milestone-close {
-      background: rgba(255, 255, 255, 0.2);
-      border: none;
+      transform: translateX(-50%) translateY(-40px);
+      background: rgba(0, 0, 0, 0.8);
       color: white;
       padding: 8px 16px;
-      border-radius: 12px;
+      border-radius: 20px;
       font-size: 14px;
-      cursor: pointer;
-      font-weight: 500;
+      z-index: 2000;
+      opacity: 0;
+      transition: all 0.3s;
+    }
+    
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    
+    .toast.hide {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-40px);
     }
 
-    .milestone-close:hover {
-      background: rgba(255, 255, 255, 0.3);
+    /* Milestone Popup */
+    .milestone-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3000;
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+
+    .milestone-overlay.show {
+      opacity: 1;
+    }
+
+    .milestone-overlay.hide {
+      opacity: 0;
+    }
+
+    .milestone-popup {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 20px;
+      width: 320px;
+      max-width: 90%;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      transform: translateY(20px);
+      transition: all 0.3s ease;
+    }
+
+    .milestone-overlay.show .milestone-popup {
+      transform: translateY(0);
+    }
+
+    .milestone-content {
+      padding: 30px 25px;
+      text-align: center;
+      color: white;
+    }
+
+    .milestone-icon {
+      font-size: 48px;
+      margin-bottom: 15px;
+      animation: bounce 1s ease-in-out;
+    }
+
+    @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-10px); }
+      60% { transform: translateY(-5px); }
+    }
+
+    .milestone-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 15px;
+      color: white;
+    }
+
+    .milestone-message {
+      font-size: 15px;
+      line-height: 1.4;
+      margin-bottom: 20px;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .milestone-count {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 25px;
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      display: inline-block;
+      color: white;
+    }
+
+    .milestone-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .milestone-btn {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 25px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .milestone-btn.primary {
+      background: white;
+      color: #667eea;
+    }
+
+    .milestone-btn.primary:hover {
+      background: #f8f9fa;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .milestone-btn.secondary {
+      background: transparent;
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .milestone-btn.secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.5);
     }
   </style>
 </head>
@@ -1498,7 +937,6 @@
   <div id="content">
     <!-- Content will be rendered by JS -->
   </div>
-  <script src="utils.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
