@@ -24,13 +24,26 @@ class BookmarkManager {
     if (this.isInitialized) return
     
     console.log('BookmarkManager initializing...')
-    await this.loadData()
-    console.log('Data loaded, bookmarks:', this.state.bookmarks.length)
-    this.cacheElements()
-    this.bindEvents()
-    await this.render()
-    this.isInitialized = true
-    console.log('BookmarkManager initialized')
+    
+    try {
+      await this.loadData()
+      console.log('Data loaded, bookmarks:', this.state.bookmarks.length)
+      
+      this.cacheElements()
+      console.log('Elements cached')
+      
+      this.bindEvents()
+      console.log('Events bound')
+      
+      await this.render()
+      console.log('Initial render complete')
+      
+      this.isInitialized = true
+      console.log('BookmarkManager initialized successfully')
+    } catch (error) {
+      console.error('Error during initialization:', error)
+      throw error
+    }
   }
 
   cacheElements() {
@@ -76,24 +89,54 @@ class BookmarkManager {
     }
     
     return new Promise(resolve => {
-      chrome.runtime.sendMessage({ action: 'getStats' }, stats => {
-        this.cache.stats = stats || { graveyardCount: 0 }
-        this.cache.statsTime = now
-        resolve(this.cache.stats)
-      })
+      try {
+        chrome.runtime.sendMessage({ action: 'getStats' }, response => {
+          if (chrome.runtime.lastError) {
+            console.error('Stats API 오류:', chrome.runtime.lastError.message)
+            this.showToast('통계 정보를 가져올 수 없습니다')
+            resolve({ graveyardCount: 0 })
+            return
+          }
+          this.cache.stats = response || { graveyardCount: 0 }
+          this.cache.statsTime = now
+          resolve(this.cache.stats)
+        })
+      } catch (error) {
+        console.error('통계 정보 오류:', error)
+        this.showToast('통계 정보를 가져올 수 없습니다')
+        resolve({ graveyardCount: 0 })
+      }
     })
   }
 
   async getProcessedBookmarks() {
-    const result = await chrome.storage.local.get('processedBookmarks')
-    return result.processedBookmarks || []
+    try {
+      const result = await chrome.storage.local.get('processedBookmarks')
+      return result.processedBookmarks || []
+    } catch (error) {
+      console.error('처리된 북마크 로드 오류:', error)
+      this.showToast('북마크 데이터를 불러올 수 없습니다')
+      return []
+    }
   }
 
   async getPendingBookmarks() {
     return new Promise(resolve => {
-      chrome.storage.local.get('pendingBookmarks', result => {
-        resolve(result.pendingBookmarks || [])
-      })
+      try {
+        chrome.storage.local.get('pendingBookmarks', result => {
+          if (chrome.runtime.lastError) {
+            console.error('대기 북마크 로드 오류:', chrome.runtime.lastError.message)
+            this.showToast('북마크 데이터를 불러올 수 없습니다')
+            resolve([])
+            return
+          }
+          resolve(result.pendingBookmarks || [])
+        })
+      } catch (error) {
+        console.error('대기 북마크 오류:', error)
+        this.showToast('북마크 데이터를 불러올 수 없습니다')
+        resolve([])
+      }
     })
   }
 
@@ -105,11 +148,10 @@ class BookmarkManager {
     })
   }
 
-  async render() {
+  async render(forceFullRender = false) {
     try {
-      console.log('Rendering, viewMode:', this.state.viewMode, 'bookmarks:', this.state.bookmarks.length)
+      console.log('Rendering, viewMode:', this.state.viewMode, 'bookmarks:', this.state.bookmarks.length, 'forceFullRender:', forceFullRender)
       const stats = await this.getStats()
-      const selectedCount = this.state.selected.size
 
       // 20의 배수 달성 시 축하 팝업 표시
       await this.checkMilestoneAchievement(stats.graveyardCount)
@@ -119,23 +161,31 @@ class BookmarkManager {
         return
       }
 
+      // 부분 업데이트가 가능한 경우에만 사용
+      if (!forceFullRender && this.canPartialUpdate()) {
+        this.updateContentOnly(stats)
+        return
+      }
+
       this.elements.content.innerHTML = `
       <!-- Header -->
       <div class="header">
         <div class="header-left">
           <h1 class="app-title">🚒 북마크 구조대 🧑‍🚒</h1>
         </div>
-        <div class="stats">
-          <div class="stat">
-            <div class="number">${this.formatCount(stats.graveyardCount)}</div>
-            <div class="label">구조</div>
+        <div class="header-right">
+          <div class="stats" role="region" aria-label="북마크 통계">
+            <div class="stat">
+              <div class="number" aria-label="구조된 북마크 ${this.formatCount(stats.graveyardCount)}개">${this.formatCount(stats.graveyardCount)}</div>
+              <div class="label">구조</div>
+            </div>
+            <div class="stat">
+              <div class="number" aria-label="대기 중인 북마크 ${this.state.bookmarks.length > 10 ? '10개 이상' : this.state.bookmarks.length + '개'}">${this.state.bookmarks.length > 10 ? '10+' : this.state.bookmarks.length}</div>
+              <div class="label">대기</div>
+            </div>
           </div>
-          <div class="stat">
-            <div class="number">${this.state.bookmarks.length > 10 ? '10+' : this.state.bookmarks.length}</div>
-            <div class="label">대기</div>
-          </div>
+          <button class="settings-btn" id="settingsBtn" aria-label="설정 열기" title="설정">⚙️</button>
         </div>
-        <button class="settings-btn" id="settingsBtn">⚙️</button>
       </div>
 
       <!-- Content -->
@@ -149,11 +199,11 @@ class BookmarkManager {
       `}
 
       <!-- Action Bar -->
-      <div class="action-bar ${selectedCount ? 'show' : ''}" id="actionBar">
-        <span>${selectedCount}개 선택</span>
+      <div class="action-bar ${this.state.selected.size ? 'show' : ''}" id="actionBar">
+        <span>${this.state.selected.size}개 선택</span>
         <div class="actions">
-          <button class="action keep" id="keepBtn" ${!selectedCount ? 'disabled' : ''}>구조</button>
-          <button class="action delete" id="deleteBtn" ${!selectedCount ? 'disabled' : ''}>삭제</button>
+          <button class="action keep" id="keepBtn" ${!this.state.selected.size ? 'disabled' : ''}>구조</button>
+          <button class="action delete" id="deleteBtn" ${!this.state.selected.size ? 'disabled' : ''}>삭제</button>
         </div>
       </div>
 
@@ -166,6 +216,10 @@ class BookmarkManager {
       // Cache new elements
       this.elements.actionBar = document.getElementById('actionBar')
       this.elements.scanBtn = document.getElementById('scanBtn')
+      
+      // 마지막 viewMode 저장 (전체 렌더링 후)
+      this._lastViewMode = this.state.viewMode
+      
       console.log('Render completed')
     } catch (error) {
       console.error('Render error:', error)
@@ -176,6 +230,9 @@ class BookmarkManager {
   bindEvents() {
     // Single delegation for all clicks
     document.addEventListener('click', this.handleClick.bind(this))
+    
+    // 키보드 네비게이션 이벤트
+    document.addEventListener('keydown', this.handleKeyDown.bind(this))
     
     // 정렬 드롭다운 이벤트
     document.addEventListener('change', async (e) => {
@@ -188,17 +245,58 @@ class BookmarkManager {
         await this.render()
       }
     })
+  }
 
-    // 정렬 순서 토글 이벤트
-    document.addEventListener('click', async (e) => {
-      if (e.target.classList.contains('sort-toggle')) {
-        if (this.state.sortBy !== 'category') {
-          this.state.sortOrder = this.state.sortOrder === 'desc' ? 'asc' : 'desc'
-          this.sortBookmarks()
-          await this.render()
-        }
+  handleKeyDown(e) {
+    const focusedElement = document.activeElement
+    
+    // 스페이스바로 북마크 선택/해제
+    if (e.key === ' ' && focusedElement.classList.contains('bookmark')) {
+      e.preventDefault()
+      this.toggleSelect(focusedElement.dataset.id)
+      return
+    }
+
+    // 엔터키로 북마크 방문
+    if (e.key === 'Enter' && focusedElement.classList.contains('bookmark')) {
+      e.preventDefault()
+      const url = focusedElement.querySelector('.visit-btn').dataset.url
+      if (url) {
+        chrome.tabs.create({ url })
       }
-    })
+      return
+    }
+
+    // 화살표 키로 북마크 간 네비게이션
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && focusedElement.classList.contains('bookmark')) {
+      e.preventDefault()
+      const bookmarks = Array.from(document.querySelectorAll('.bookmark'))
+      const currentIndex = bookmarks.indexOf(focusedElement)
+      
+      let nextIndex
+      if (e.key === 'ArrowDown') {
+        nextIndex = currentIndex + 1 < bookmarks.length ? currentIndex + 1 : 0
+      } else {
+        nextIndex = currentIndex - 1 >= 0 ? currentIndex - 1 : bookmarks.length - 1
+      }
+      
+      bookmarks[nextIndex].focus()
+      return
+    }
+
+    // ESC 키로 선택 해제
+    if (e.key === 'Escape') {
+      this.state.selected.clear()
+      this.updateUI()
+      return
+    }
+
+    // Ctrl+A로 전체 선택
+    if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      this.toggleSelectAll()
+      return
+    }
   }
 
   async handleClick(e) {
@@ -222,6 +320,15 @@ class BookmarkManager {
       await this.goBackToCategories()
     } else if (target.id === 'selectAllBtn') {
       this.toggleSelectAll()
+    } else if (target.classList.contains('sort-toggle')) {
+      // 정렬 순서 토글 처리
+      console.log('Sort toggle clicked, current sortBy:', this.state.sortBy, 'current sortOrder:', this.state.sortOrder)
+      if (this.state.sortBy !== 'category') {
+        this.state.sortOrder = this.state.sortOrder === 'desc' ? 'asc' : 'desc'
+        console.log('New sortOrder:', this.state.sortOrder)
+        this.sortBookmarks()
+        await this.render()
+      }
     } else if (target.closest('.bookmark')) {
       const bookmark = target.closest('.bookmark')
       if (!target.classList.contains('visit-btn')) {
@@ -283,13 +390,115 @@ class BookmarkManager {
     }
   }
 
+  canPartialUpdate() {
+    // 부분 업데이트가 가능한 조건들
+    const hasExistingContent = document.querySelector('.content')
+    const hasBookmarksList = document.querySelector('.bookmarks')
+    const isSameViewMode = this._lastViewMode === this.state.viewMode
+    
+    return hasExistingContent && hasBookmarksList && isSameViewMode
+  }
+
+  async updateContentOnly(stats) {
+    // 헤더 스탯만 업데이트
+    const graveyardCountEl = document.querySelector('.header .stat .number')
+    const pendingCountEl = document.querySelectorAll('.header .stat .number')[1]
+    
+    if (graveyardCountEl) {
+      graveyardCountEl.textContent = this.formatCount(stats.graveyardCount)
+    }
+    if (pendingCountEl) {
+      pendingCountEl.textContent = this.state.bookmarks.length > 10 ? '10+' : this.state.bookmarks.length
+    }
+
+    // 북마크 목록만 업데이트 (viewMode에 따라)
+    const bookmarksContainer = document.querySelector('.bookmarks')
+    if (bookmarksContainer && (this.state.viewMode === 'list' || this.state.viewMode === 'category-detail')) {
+      const displayBookmarks = this.getCurrentDisplayBookmarks()
+      if (this.state.viewMode === 'list') {
+        bookmarksContainer.innerHTML = this.renderBookmarksList(displayBookmarks)
+      } else if (this.state.viewMode === 'category-detail') {
+        // 카테고리 상세 뷰용 북마크 렌더링
+        bookmarksContainer.innerHTML = displayBookmarks.map(bookmark => {
+          let faviconUrl = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23999"><rect width="16" height="16" rx="2"/></svg>'
+          try {
+            faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(bookmark.url).hostname}`
+          } catch (e) {
+            // fallback icon
+          }
+          return `
+            <div class="bookmark ${this.state.selected.has(bookmark.id) ? 'selected' : ''}" data-id="${bookmark.id}">
+              <div class="checkbox"></div>
+              <img src="${faviconUrl}" class="favicon">
+              <div class="info">
+                <div class="title">${bookmark.title || 'Untitled'}</div>
+                <div class="meta">${bookmark.daysSinceAdded || 0}일 전 저장</div>
+              </div>
+              <button class="visit-btn" data-url="${bookmark.url}">↗</button>
+            </div>
+          `
+        }).join('')
+      }
+    }
+
+    // 더보기 버튼 업데이트
+    const loadMoreBtn = document.getElementById('loadMore')
+    const hasMore = this.state.viewMode === 'category-detail' 
+      ? this.state.displayCount < this.state.bookmarks.filter(b => (b.category || 'other') === this.state.selectedCategory).length
+      : this.state.displayCount < this.state.bookmarks.length
+    
+    if (loadMoreBtn) {
+      loadMoreBtn.style.display = hasMore ? 'block' : 'none'
+    }
+    
+    // 마지막 viewMode 저장
+    this._lastViewMode = this.state.viewMode
+  }
+
+  renderBookmarksList(bookmarks) {
+    return bookmarks.map(bookmark => {
+      let faviconUrl = 'data:image/svg+xml,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" fill=\"%23999\"><rect width=\"16\" height=\"16\" rx=\"2\"/></svg>'
+      try {
+        faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(bookmark.url).hostname}`
+      } catch (e) {
+        // fallback icon
+      }
+      
+      const isSelected = this.state.selected.has(bookmark.id)
+      const ariaLabel = `${bookmark.title}, ${bookmark.daysSinceAdded || 0}일 전 저장, ${BookmarkUtils.getCategoryName(bookmark.category || 'other')} 카테고리${isSelected ? ', 선택됨' : ''}`
+      
+      return `
+        <div class=\"bookmark ${isSelected ? 'selected' : ''}\" 
+             data-id=\"${bookmark.id}\"
+             tabindex=\"0\"
+             role=\"option\"
+             aria-selected=\"${isSelected}\"
+             aria-label=\"${ariaLabel}\">
+          <div class=\"checkbox\" aria-hidden=\"true\"></div>
+          <img class=\"favicon\" src=\"${faviconUrl}\" alt=\"\" role=\"presentation\">
+          <div class=\"info\">
+            <div class=\"title\">${bookmark.title}</div>
+            <div class=\"meta\">
+              <span>${bookmark.daysSinceAdded || 0}일 전 저장</span>
+              <span aria-hidden=\"true\">•</span>
+              <span>${BookmarkUtils.getCategoryName(bookmark.category || 'other')}</span>
+            </div>
+          </div>
+          <button class=\"visit-btn\" data-url=\"${bookmark.url}\" aria-label=\"${bookmark.title} 방문하기\" title=\"북마크 방문\">↗</button>
+        </div>
+      `
+    }).join('')
+  }
+
   sortBookmarks() {
     const isAsc = this.state.sortOrder === 'asc'
     
     switch (this.state.sortBy) {
       case 'daysSinceVisit':
         this.state.bookmarks.sort((a, b) => {
-          const diff = b.daysSinceVisit - a.daysSinceVisit
+          const aValue = a.daysSinceVisit || 0
+          const bValue = b.daysSinceVisit || 0
+          const diff = bValue - aValue
           return isAsc ? -diff : diff
         })
         break
@@ -298,21 +507,23 @@ class BookmarkManager {
           const categoryA = a.category || 'other'
           const categoryB = b.category || 'other'
           if (categoryA === categoryB) {
-            return b.daysSinceVisit - a.daysSinceVisit
+            const aValue = a.daysSinceVisit || 0
+            const bValue = b.daysSinceVisit || 0
+            return bValue - aValue
           }
           return categoryA.localeCompare(categoryB)
-        })
-        break
-      case 'dateAdded':
-        this.state.bookmarks.sort((a, b) => {
-          const diff = (b.dateAdded || 0) - (a.dateAdded || 0)
-          return isAsc ? -diff : diff
         })
         break
     }
   }
 
   getCurrentDisplayBookmarks() {
+    if (this.state.viewMode === 'category-detail') {
+      const categoryBookmarks = this.state.bookmarks.filter(b => 
+        (b.category || 'other') === this.state.selectedCategory
+      )
+      return categoryBookmarks.slice(0, this.state.displayCount)
+    }
     return this.state.bookmarks.slice(0, this.state.displayCount)
   }
 
@@ -476,7 +687,7 @@ class BookmarkManager {
           bookmark.aiEnhanced = true
         } else {
           // fallback to rule-based categorization
-          bookmark.category = this.categorizeBookmarkFallback(bookmark)
+          bookmark.category = BookmarkUtils.categorizeBookmark(bookmark)
           bookmark.aiEnhanced = false
         }
       })
@@ -485,7 +696,7 @@ class BookmarkManager {
       console.error('AI 카테고리 분석 실패:', error)
       // fallback: 기존 룰 기반 분류
       this.state.bookmarks.forEach(bookmark => {
-        bookmark.category = this.categorizeBookmarkFallback(bookmark)
+        bookmark.category = BookmarkUtils.categorizeBookmark(bookmark)
         bookmark.aiEnhanced = false
       })
     }
@@ -548,47 +759,7 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
     }
   }
 
-  async getOpenAIKey() {
-    // 확장 프로그램 설정에서 API 키 가져오기
-    const result = await chrome.storage.local.get('openaiApiKey')
-    if (!result.openaiApiKey) {
-      throw new Error('OpenAI API 키가 설정되지 않았습니다')
-    }
-    return result.openaiApiKey
-  }
 
-  categorizeBookmarkFallback(bookmark) {
-    // 8가지 표준 카테고리 기반 분류 (fallback)
-    const title = (bookmark.title || '').toLowerCase()
-    const url = (bookmark.url || '').toLowerCase()
-    const text = `${title} ${url}`
-
-    // 1. Work/업무
-    if (/notion|slack|jira|confluence|trello|asana|zoom|teams|office|excel|word|powerpoint|google drive|dropbox|figma|adobe/.test(text)) return 'work'
-    
-    // 2. Reference/자료
-    if (/wikipedia|reference|wiki|docs|documentation|api|guide|manual|how-to|tips|tricks|백과|사전|매뉴얼|데이터베이스/.test(text)) return 'reference'
-    
-    // 3. Design/디자인
-    if (/behance|dribbble|pinterest|unsplash|icon|font|color|palette|photoshop|sketch|figma|디자인|아이콘|폰트|컬러/.test(text)) return 'design'
-    
-    // 4. News/뉴스·트렌드
-    if (/news|뉴스|신문|기사|blog|medium|techcrunch|경제|정치|사회|스포츠|연합뉴스|조선일보|중앙일보|동아일보|한겨레|매일경제|한국경제|cnn|bbc|reuters/.test(text)) return 'news'
-    
-    // 5. Entertainment/엔터테인먼트
-    if (/youtube|netflix|disney|spotify|music|movie|drama|game|entertainment|fun|웹툰|만화|게임|영화|드라마|음악/.test(text)) return 'entertainment'
-    
-    // 6. Shopping/구매
-    if (/amazon|ebay|쿠팡|11번가|g마켓|옥션|위메프|티몬|무신사|29cm|shop|store|buy|purchase|cart|order|product|쇼핑몰|가격비교|특가|중고장터/.test(text)) return 'shopping'
-    
-    // 7. Learning/교육·튜토리얼
-    if (/coursera|udemy|khan academy|edx|codecademy|freecodecamp|tutorial|learn|course|education|university|college|study|온라인강의|학습|튜토리얼|기술블로그/.test(text)) return 'learning'
-    
-    // 8. Social/커뮤니티·SNS
-    if (/facebook|twitter|instagram|reddit|discord|telegram|kakaotalk|naver cafe|clien|ruliweb|dcinside|inven|커뮤니티|포럼|sns|소셜/.test(text)) return 'social'
-    
-    return 'other'
-  }
 
   renderContent() {
     switch (this.state.viewMode) {
@@ -608,21 +779,20 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
     return `
       <div class="content">
         <div class="content-header">
-          <button class="select-all-btn" id="selectAllBtn">
-            ${this.isAllDisplayedSelected() ? '전체해제' : '전체선택'}
-          </button>
           <div class="sort-controls">
             <select class="sort-dropdown" id="sortSelect">
               <option value="daysSinceVisit" ${this.state.sortBy === 'daysSinceVisit' ? 'selected' : ''}>오래된 순</option>
               <option value="category" ${this.state.sortBy === 'category' ? 'selected' : ''}>카테고리별</option>
-              <option value="dateAdded" ${this.state.sortBy === 'dateAdded' ? 'selected' : ''}>추가일순</option>
             </select>
             ${this.state.sortBy !== 'category' ? `
-              <button class="sort-toggle" title="${this.state.sortOrder === 'desc' ? '내림차순' : '오름차순'}">
+              <button class="sort-toggle" title="${this.state.sortOrder === 'desc' ? '내림차순 (최신→오래된)' : '오름차순 (오래된→최신)'}">
                 ${this.state.sortOrder === 'desc' ? '↓' : '↑'}
               </button>
             ` : ''}
           </div>
+          <button class="select-all-btn" id="selectAllBtn">
+            ${this.isAllDisplayedSelected() ? '전체해제' : '전체선택'}
+          </button>
         </div>
         <div class="bookmarks" id="bookmarkList">
           ${displayBookmarks.map(bookmark => {
@@ -638,9 +808,9 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
                 <img src="${faviconUrl}" class="favicon">
                 <div class="info">
                   <div class="title">${bookmark.title || 'Untitled'}</div>
-                  <div class="meta">${bookmark.daysSinceVisit || 0}일째 미방문</div>
+                  <div class="meta">${bookmark.daysSinceAdded || 0}일 전 저장</div>
                 </div>
-                <button class="visit-btn" data-url="${bookmark.url}">→</button>
+                <button class="visit-btn" data-url="${bookmark.url}">↗</button>
               </div>
             `
           }).join('')}
@@ -656,18 +826,16 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
     return `
       <div class="content">
         <div class="content-header">
-          <h2>카테고리별 구조</h2>
           <select class="sort-dropdown" id="sortSelect">
-            <option value="daysSinceVisit">오래된 순</option>
-            <option value="category" selected>카테고리별</option>
-            <option value="dateAdded">추가일순</option>
+            <option value="daysSinceVisit" ${this.state.sortBy === 'daysSinceVisit' ? 'selected' : ''}>오래된 순</option>
+            <option value="category" ${this.state.sortBy === 'category' ? 'selected' : ''}>카테고리별</option>
           </select>
         </div>
         <div class="category-grid">
           ${Object.entries(categories).map(([category, bookmarks]) => `
             <div class="category-tile" data-category="${category}">
-              <div class="tile-icon">${this.getCategoryIcon(category)}</div>
-              <div class="tile-title">${this.getCategoryName(category)}</div>
+              <div class="tile-icon">${BookmarkUtils.getCategoryIcon(category)}</div>
+              <div class="tile-title">${BookmarkUtils.getCategoryName(category)}</div>
               <div class="tile-count">${bookmarks.length}개</div>
             </div>
           `).join('')}
@@ -687,7 +855,7 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
       <div class="content">
         <div class="content-header">
           <button class="back-btn" id="backBtn">← 카테고리</button>
-          <h2>${this.getCategoryName(this.state.selectedCategory)}</h2>
+          <h2>${BookmarkUtils.getCategoryName(this.state.selectedCategory)}</h2>
           <button class="select-all-btn" id="selectAllBtn">
             ${this.isAllDisplayedSelected() ? '전체해제' : '전체선택'}
           </button>
@@ -706,9 +874,9 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
                 <img src="${faviconUrl}" class="favicon">
                 <div class="info">
                   <div class="title">${bookmark.title || 'Untitled'}</div>
-                  <div class="meta">${bookmark.daysSinceVisit || 0}일째 미방문</div>
+                  <div class="meta">${bookmark.daysSinceAdded || 0}일 전 저장</div>
                 </div>
-                <button class="visit-btn" data-url="${bookmark.url}">→</button>
+                <button class="visit-btn" data-url="${bookmark.url}">↗</button>
               </div>
             `
           }).join('')}
@@ -728,47 +896,18 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
     return groups
   }
 
-  getCategoryIcon(category) {
-    const icons = {
-      work: '💼',
-      reference: '📖',
-      design: '🎨',
-      news: '📰',
-      entertainment: '🎬',
-      shopping: '🛒',
-      learning: '📚',
-      social: '💬',
-      other: '🔖'
-    }
-    return icons[category] || '🔖'
-  }
-
-  getCategoryName(category) {
-    const names = {
-      work: '업무',
-      reference: '자료',
-      design: '디자인',
-      news: '뉴스·트렌드',
-      entertainment: '엔터테인먼트',
-      shopping: '구매',
-      learning: '교육·튜토리얼',
-      social: '커뮤니티·SNS',
-      other: '기타'
-    }
-    return names[category] || '기타'
-  }
 
   async selectCategory(category) {
     this.state.selectedCategory = category
     this.state.viewMode = 'category-detail'
     this.state.displayCount = 5 // 리셋
-    await this.render()
+    await this.render(true) // 강제 전체 렌더링
   }
 
   async goBackToCategories() {
     this.state.viewMode = 'categories'
     this.state.selectedCategory = null
-    await this.render()
+    await this.render(true) // 강제 전체 렌더링
   }
 
   async loadMore() {
@@ -786,7 +925,7 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
         this.state.bookmarks.length
       )
     }
-    await this.render()
+    await this.render() // 부분 업데이트 가능
   }
 
   async scan() {
@@ -797,8 +936,14 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
     text.textContent = '찾는 중...'
     
     try {
-      await new Promise(resolve => {
-        chrome.runtime.sendMessage({ action: 'scan' }, resolve)
+      await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ action: 'scan' }, response => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message))
+            return
+          }
+          resolve(response)
+        })
       })
       
       // Reset state
@@ -815,6 +960,9 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
       this.showToast(this.state.bookmarks.length > 0 
         ? `${this.state.bookmarks.length}개 발견` 
         : '모든 북마크 활성')
+    } catch (error) {
+      console.error('스캔 오류:', error)
+      this.showToast('북마크 스캔 중 오류가 발생했습니다')
     } finally {
       btn.disabled = false
       text.textContent = '부활시킬 북마크 찾기'
@@ -845,9 +993,26 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
     // Remove from display
     this.state.bookmarks = this.state.bookmarks.filter(b => !selectedIds.includes(b.id))
     this.state.selected.clear()
-    this.state.displayCount = Math.min(this.state.displayCount, this.state.bookmarks.length)
     
-    await this.render()
+    // 카테고리 상세 뷰인 경우 해당 카테고리의 북마크 수에 맞춰 displayCount 조정
+    if (this.state.viewMode === 'category-detail') {
+      const categoryBookmarks = this.state.bookmarks.filter(b => 
+        (b.category || 'other') === this.state.selectedCategory
+      )
+      this.state.displayCount = Math.min(this.state.displayCount, categoryBookmarks.length)
+      
+      // 카테고리에 더 이상 북마크가 없으면 카테고리 뷰로 돌아가기
+      if (categoryBookmarks.length === 0) {
+        this.state.viewMode = 'categories'
+        this.state.selectedCategory = null
+        this.state.displayCount = 5
+      }
+    } else {
+      this.state.displayCount = Math.min(this.state.displayCount, this.state.bookmarks.length)
+    }
+    
+    // 전체 렌더링 강제 (카테고리가 변경될 수 있으므로)
+    await this.render(true)
     this.showToast(`${selectedIds.length}개 ${action === 'keep' ? '구조' : '삭제'}`)
   }
 
@@ -880,7 +1045,7 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
             <div class="time-period-selector">
               <div class="period-grid">
                 ${[
-                  { id: 'week1', label: '1주일', days: '1-7일' },
+                  { id: 'week1', label: '1주일', days: '0-7일' },
                   { id: 'week2', label: '2주일', days: '8-14일' },
                   { id: 'week3', label: '3주일', days: '15-21일' },
                   { id: 'month1', label: '1개월', days: '22-30일' },
@@ -933,15 +1098,6 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-          
-          <div class="setting">
-            <h4>AI 카테고리 분류</h4>
-            <input type="password" id="openaiApiKey" placeholder="OpenAI API 키 (선택사항)" 
-                   value="${this.state.settings.openaiApiKey || ''}">
-            <div style="font-size: 11px; color: #98989d; margin-top: 4px;">
-              더 정확한 개인화된 카테고리 분류를 위해 OpenAI API 키를 입력하세요
             </div>
           </div>
         </div>
@@ -1045,7 +1201,7 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
   }
 
   formatTimeDisplay(time) {
-    const [hour, minute] = time.split(':')
+    const [hour] = time.split(':')
     const hourNum = parseInt(hour)
     
     if (hourNum === 9) return '오전 9시'
@@ -1077,8 +1233,6 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
     
     // 기타 설정
     newSettings.emailNotifications = document.getElementById('emailNotifications').checked
-    newSettings.userEmail = document.getElementById('userEmail').value
-    newSettings.openaiApiKey = document.getElementById('openaiApiKey').value
     
     // 선택된 알림 요일 수집
     const selectedDays = Array.from(modal.querySelectorAll('.day-btn.selected')).map(btn => 
@@ -1092,11 +1246,6 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
     
     chrome.runtime.sendMessage({ action: 'updateSettings', settings: newSettings }, async response => {
       if (response?.success) {
-        // API 키가 변경된 경우 AI 캐시 초기화
-        if (this.state.settings.openaiApiKey !== newSettings.openaiApiKey) {
-          await chrome.storage.local.remove(['aiCategories', 'aiCategories_time'])
-          console.log('🔄 AI 카테고리 캐시 초기화됨')
-        }
         
         this.state.settings = newSettings
         // 설정 변경 후 상태 리셋 및 데이터 새로고침
@@ -1115,8 +1264,23 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
   }
 }
 
-// Initialize
+// Initialize - 즉시 실행
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOM loaded, initializing manager...')
+  
+  // BookmarkUtils 체크 및 fallback 제공
+  if (typeof BookmarkUtils === 'undefined') {
+    console.warn('BookmarkUtils not loaded, using fallback')
+    window.BookmarkUtils = {
+      categorizeBookmark: () => 'other',
+      getCategoryIcon: (category) => '🔖',
+      getCategoryName: (category) => '기타'
+    }
+  }
+  
   window.bookmarkManager = new BookmarkManager()
-  window.bookmarkManager.init()
+  window.bookmarkManager.init().catch(error => {
+    console.error('Failed to initialize bookmark manager:', error)
+    document.getElementById('content').innerHTML = '<div style="padding: 20px; color: red;">초기화 오류가 발생했습니다: ' + error.message + '</div>'
+  })
 })

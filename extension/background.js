@@ -1,6 +1,6 @@
-// background.js - 오류 수정 완료 버전
-const API_URL = 'http://localhost:3000/api'
-const RESCUE_QUEUE_FOLDER = '🚒 구조 대기실'
+// background.js - 코드 최적화 버전
+
+const GRAVEYARD_FOLDER = '🔖 구조된 북마크'
 
 // 검색엔진 도메인 목록
 const SEARCH_ENGINE_DOMAINS = [
@@ -19,11 +19,7 @@ const DEFAULT_SETTINGS = {
   year1: { enabled: false, days: 365, label: '1년' },
   year3: { enabled: false, days: 1095, label: '3년' },
   year3plus: { enabled: false, days: 9999, label: '3년 이상' },
-  emailNotifications: false,
-  userEmail: '',
-  emailDays: [], // 알림 요일 배열 (0=일, 1=월, ..., 6=토)
-  emailTime: '09:00', // 알림 시간 (24시간 형식)
-  openaiApiKey: ''
+  emailNotifications: false
 }
 
 // 초기화
@@ -32,8 +28,33 @@ if (chrome.runtime && chrome.runtime.onInstalled) {
     console.log('북마크 구조대 설치 완료!')
     createGraveyardFolder()
     initializeSettings()
+    setupPeriodicFolderCheck()
   })
 }
+
+// 확장 프로그램 시작시 폴더 확인
+if (chrome.runtime && chrome.runtime.onStartup) {
+  chrome.runtime.onStartup.addListener(() => {
+    console.log('Extension startup - verifying graveyard folder')
+    verifyAndRecoverGraveyardFolder()
+  })
+}
+
+// 주기적 폴더 확인 설정 (매 30분마다)
+function setupPeriodicFolderCheck() {
+  chrome.alarms.create('checkGraveyardFolder', {
+    delayInMinutes: 30,
+    periodInMinutes: 30
+  })
+}
+
+// 알람 리스너 - 폴더 확인
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'checkGraveyardFolder') {
+    console.log('Periodic graveyard folder check')
+    verifyAndRecoverGraveyardFolder()
+  }
+})
 
 // 알람 리스너 비활성화
 // const dailyCheckAlarmListener = (alarm) => {
@@ -58,7 +79,7 @@ async function initializeSettings() {
   }
 }
 
-// 묘지 폴더 생성
+// 묘지 폴더 생성 및 복구
 async function createGraveyardFolder() {
   try {
     const bookmarks = await chrome.bookmarks.getTree()
@@ -69,11 +90,23 @@ async function createGraveyardFolder() {
     )
     
     if (!existing) {
+      console.log('Creating graveyard folder:', GRAVEYARD_FOLDER)
       const graveyard = await chrome.bookmarks.create({
         parentId: bookmarkBar.id,
         title: GRAVEYARD_FOLDER
       })
-      await chrome.storage.local.set({ graveyardId: graveyard.id })
+      await chrome.storage.local.set({ 
+        graveyardId: graveyard.id,
+        folderRecreatedAt: Date.now()
+      })
+      
+      // 사용자에게 폴더 생성 알림
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'icon.png',
+        title: 'Bookmark Graveyard',
+        message: `"${GRAVEYARD_FOLDER}" 폴더가 생성되었습니다.`
+      })
     } else {
       await chrome.storage.local.set({ graveyardId: existing.id })
     }
@@ -82,16 +115,70 @@ async function createGraveyardFolder() {
   }
 }
 
+// 폴더 존재 여부 확인 및 복구
+async function verifyAndRecoverGraveyardFolder() {
+  try {
+    const { graveyardId } = await chrome.storage.local.get(['graveyardId'])
+    
+    if (!graveyardId) {
+      console.log('No graveyard folder ID found, creating new folder')
+      await createGraveyardFolder()
+      return true
+    }
+    
+    // 저장된 ID로 폴더가 실제로 존재하는지 확인
+    try {
+      const folder = await chrome.bookmarks.get(graveyardId)
+      if (folder && folder[0] && folder[0].title === GRAVEYARD_FOLDER) {
+        return true // 폴더가 정상적으로 존재
+      }
+    } catch (error) {
+      console.log('Stored folder ID is invalid, folder may have been deleted')
+    }
+    
+    // 폴더가 삭제되었을 경우 다시 찾아보기
+    const bookmarks = await chrome.bookmarks.getTree()
+    const bookmarkBar = bookmarks[0].children[0]
+    const existing = bookmarkBar.children.find(
+      child => child.title === GRAVEYARD_FOLDER
+    )
+    
+    if (existing) {
+      // 폴더는 존재하지만 ID가 달라진 경우 (복구된 경우)
+      await chrome.storage.local.set({ graveyardId: existing.id })
+      console.log('Found existing graveyard folder with different ID, updated')
+      return true
+    } else {
+      // 완전히 삭제된 경우 새로 생성
+      console.log('Graveyard folder was deleted, recreating...')
+      await createGraveyardFolder()
+      
+      // 사용자에게 복구 알림
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'icon.png',
+        title: 'Bookmark Graveyard - 폴더 복구됨',
+        message: `삭제된 "${GRAVEYARD_FOLDER}" 폴더가 자동으로 복구되었습니다.`
+      })
+      return true
+    }
+  } catch (error) {
+    console.error('Error verifying graveyard folder:', error)
+    return false
+  }
+}
+
 // 북마크 스캔 (복제 기반)
 async function scanBookmarks() {
   try {
-    const { graveyardId, cleanupSettings } = await chrome.storage.local.get(['graveyardId', 'cleanupSettings'])
-    
-    if (!graveyardId) {
-      console.log('Graveyard folder not found, creating...')
-      await createGraveyardFolder()
+    // 폴더 존재 여부 확인 및 필요시 복구
+    const folderVerified = await verifyAndRecoverGraveyardFolder()
+    if (!folderVerified) {
+      console.error('Failed to verify/recover graveyard folder')
       return
     }
+    
+    const { graveyardId, cleanupSettings } = await chrome.storage.local.get(['graveyardId', 'cleanupSettings'])
     
     if (!cleanupSettings) {
       await initializeSettings()
@@ -122,50 +209,31 @@ async function scanBookmarks() {
       }
     }
 
-    // 8가지 표준 카테고리 기반 북마크 자동 분류
+    // 간단한 카테고리 분류 함수
     function categorizeBookmark(bookmark) {
-      const title = bookmark.title.toLowerCase()
-      const url = bookmark.url.toLowerCase()
+      const title = (bookmark.title || '').toLowerCase()
+      const url = (bookmark.url || '').toLowerCase()
       const text = `${title} ${url}`
+      
+      let domain = ''
+      try {
+        domain = new URL(bookmark.url).hostname.toLowerCase()
+      } catch (e) {
+        domain = ''
+      }
 
-      // 1. Work/업무
-      if (/notion|slack|jira|confluence|trello|asana|zoom|teams|office|excel|word|powerpoint|google drive|dropbox|figma|adobe/.test(text)) {
+      // 기본 카테고리 분류
+      if (/github|stackoverflow|codepen/.test(domain) || /개발|프로그래밍|코딩/.test(text)) {
+        return 'development'
+      }
+      if (/notion|slack|zoom|docs|office/.test(domain) || /업무|회사/.test(text)) {
         return 'work'
       }
-      
-      // 2. Reference/자료
-      if (/wikipedia|reference|wiki|docs|documentation|api|guide|manual|how-to|tips|tricks|백과|사전|매뉴얼|데이터베이스/.test(text)) {
-        return 'reference'
-      }
-      
-      // 3. Design/디자인
-      if (/behance|dribbble|pinterest|unsplash|icon|font|color|palette|photoshop|sketch|figma|디자인|아이콘|폰트|컬러/.test(text)) {
-        return 'design'
-      }
-      
-      // 4. News/뉴스·트렌드
-      if (/news|뉴스|신문|기사|blog|medium|techcrunch|경제|정치|사회|스포츠|연합뉴스|조선일보|중앙일보|동아일보|한겨레|매일경제|한국경제|cnn|bbc|reuters/.test(text)) {
-        return 'news'
-      }
-      
-      // 5. Entertainment/엔터테인먼트
-      if (/youtube|netflix|disney|spotify|music|movie|drama|game|entertainment|fun|웹툰|만화|게임|영화|드라마|음악/.test(text)) {
+      if (/youtube|netflix|spotify/.test(domain) || /영화|음악|게임/.test(text)) {
         return 'entertainment'
       }
-      
-      // 6. Shopping/구매
-      if (/amazon|ebay|쿠팡|11번가|g마켓|옥션|위메프|티몬|무신사|29cm|shop|store|buy|purchase|cart|order|product|쇼핑몰|가격비교|특가|중고장터/.test(text)) {
+      if (/amazon|coupang|shopping/.test(domain) || /쇼핑|구매/.test(text)) {
         return 'shopping'
-      }
-      
-      // 7. Learning/교육·튜토리얼
-      if (/coursera|udemy|khan academy|edx|codecademy|freecodecamp|tutorial|learn|course|education|university|college|study|온라인강의|학습|튜토리얼|기술블로그/.test(text)) {
-        return 'learning'
-      }
-      
-      // 8. Social/커뮤니티·SNS
-      if (/facebook|twitter|instagram|reddit|discord|telegram|kakaotalk|naver cafe|clien|ruliweb|dcinside|inven|커뮤니티|포럼|sns|소셜/.test(text)) {
-        return 'social'
       }
       
       return 'other'
@@ -223,15 +291,22 @@ async function scanBookmarks() {
         pendingBookmarks: bookmarksToProcess,
         lastScanDate: new Date().toISOString()
       })
-      
-      // 이메일 알림 (활성화된 경우)
-      if (cleanupSettings.emailNotifications && cleanupSettings.userEmail) {
-        await sendEmailNotification(bookmarksToProcess, cleanupSettings.userEmail)
-      }
     }
   } catch (error) {
     console.error('Error scanning bookmarks:', error)
   }
+}
+
+// 브라우저 세션 시작시 폴더 확인 (첫 번째 탭 활성화시)
+let sessionFolderChecked = false
+if (chrome.tabs && chrome.tabs.onActivated) {
+  chrome.tabs.onActivated.addListener(() => {
+    if (!sessionFolderChecked) {
+      sessionFolderChecked = true
+      console.log('First tab activation - checking graveyard folder')
+      verifyAndRecoverGraveyardFolder()
+    }
+  })
 }
 
 // 탭 업데이트 시 방문 기록
@@ -330,94 +405,6 @@ async function copyBookmarksToGraveyard(bookmarks) {
   }
 }
 
-// 부드러운 이메일 알림
-async function sendEmailNotification(bookmarks, userEmail) {
-  try {
-    const emailBody = generateEmailContent(bookmarks)
-    
-    // 서버로 이메일 전송 요청
-    const response = await fetch(`${API_URL}/send-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: userEmail,
-        subject: '💭 저장하고 깜빡하신 북마크들이 있어요',
-        html: emailBody
-      })
-    })
-    
-    if (response.ok) {
-      console.log('이메일 알림 전송 완료')
-    } else {
-      console.error('이메일 전송 실패')
-    }
-  } catch (error) {
-    console.error('Error sending email notification:', error)
-  }
-}
-
-// 부드러운 이메일 콘텐츠 생성
-function generateEmailContent(bookmarks) {
-  const groupedByPeriod = bookmarks.reduce((acc, bookmark) => {
-    if (!acc[bookmark.period]) acc[bookmark.period] = []
-    acc[bookmark.period].push(bookmark)
-    return acc
-  }, {})
-  
-  let content = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #7c3aed; margin-bottom: 10px;">🌙 북마크가 잊혀져가고 있어요</h1>
-        <p style="color: #6b7280; font-size: 16px;">소중히 저장해두신 링크들이 혼자 기다리고 있네요</p>
-      </div>
-  `
-  
-  for (const [period, periodBookmarks] of Object.entries(groupedByPeriod)) {
-    content += `
-      <div style="background: #f9fafb; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-        <h3 style="color: #374151; margin-bottom: 15px; font-size: 18px;">
-          ${period} 전에 저장하신 북마크들
-        </h3>
-    `
-    
-    periodBookmarks.slice(0, 5).forEach(bookmark => {
-      content += `
-        <div style="background: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #7c3aed;">
-          <div style="font-weight: 500; margin-bottom: 5px;">${bookmark.title}</div>
-          <a href="${bookmark.url}" style="color: #7c3aed; text-decoration: none; font-size: 14px;">${bookmark.url}</a>
-          <div style="color: #9ca3af; font-size: 12px; margin-top: 5px;">
-            ${bookmark.daysSinceAdded}일 전 저장 · ${bookmark.daysSinceVisit}일째 미방문
-          </div>
-        </div>
-      `
-    })
-    
-    if (periodBookmarks.length > 5) {
-      content += `
-        <p style="color: #6b7280; font-style: italic; margin-top: 10px;">
-          외 ${periodBookmarks.length - 5}개의 북마크가 더 있어요
-        </p>
-      `
-    }
-    
-    content += `</div>`
-  }
-  
-  content += `
-      <div style="text-align: center; margin-top: 30px; padding: 20px; background: #fef3c7; border-radius: 12px;">
-        <p style="color: #92400e; margin-bottom: 10px;">💡 이런 북마크들, 한번씩 둘러보는 건 어떨까요?</p>
-        <p style="color: #b45309; font-size: 14px;">필요 없다면 정리해서 북마크함을 더 깔끔하게 만들어보세요!</p>
-      </div>
-      
-      <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #9ca3af;">
-        <p>북마크 구조대가 전해드리는 알림입니다 🌟</p>
-        <p>이 메일이 불편하시면 언제든 설정에서 끌 수 있어요</p>
-      </div>
-    </div>
-  `
-  
-  return content
-}
 
 async function getStats() {
   try {
