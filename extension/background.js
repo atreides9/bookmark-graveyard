@@ -16,10 +16,7 @@ const DEFAULT_SETTINGS = {
   week3: { enabled: false, days: 21, label: '3주일' },
   month1: { enabled: false, days: 30, label: '1개월' },
   month6: { enabled: false, days: 180, label: '6개월' },
-  year1: { enabled: false, days: 365, label: '1년' },
-  year3: { enabled: false, days: 1095, label: '3년' },
-  year3plus: { enabled: false, days: 9999, label: '3년 이상' },
-  emailNotifications: false
+  year1: { enabled: false, days: 9999, label: '1년 이상' }
 }
 
 // 초기화

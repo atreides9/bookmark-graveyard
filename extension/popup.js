@@ -555,9 +555,7 @@ class BookmarkManager {
     if (this.state.settings.week3?.enabled) enabledPeriods.push({ min: 15, max: 21 })
     if (this.state.settings.month1?.enabled) enabledPeriods.push({ min: 22, max: 30 })
     if (this.state.settings.month6?.enabled) enabledPeriods.push({ min: 31, max: 180 })
-    if (this.state.settings.year1?.enabled) enabledPeriods.push({ min: 181, max: 365 })
-    if (this.state.settings.year3?.enabled) enabledPeriods.push({ min: 366, max: 1095 })
-    if (this.state.settings.year3plus?.enabled) enabledPeriods.push({ min: 1096, max: 999999 })
+    if (this.state.settings.year1?.enabled) enabledPeriods.push({ min: 181, max: 999999 })
     
     // 활성화된 기간이 없으면 모든 북마크 반환
     if (enabledPeriods.length === 0) return bookmarks
@@ -1050,9 +1048,7 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
                   { id: 'week3', label: '3주일', days: '15-21일' },
                   { id: 'month1', label: '1개월', days: '22-30일' },
                   { id: 'month6', label: '6개월', days: '1-6개월' },
-                  { id: 'year1', label: '1년', days: '6-12개월' },
-                  { id: 'year3', label: '3년', days: '1-3년' },
-                  { id: 'year3plus', label: '3년+', days: '3년 이상' }
+                  { id: 'year1', label: '1년 이상', days: '6개월 이상' }
                 ].map(period => `
                   <button type="button" class="period-option ${this.state.settings[period.id]?.enabled ? 'selected' : ''}" 
                           data-period="${period.id}">
@@ -1063,40 +1059,6 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
               </div>
               <div class="period-summary">
                 ${this.getSelectedPeriodsText()}
-              </div>
-            </div>
-          </div>
-          <div class="setting">
-            <h4>이메일 알림</h4>
-            <label>
-              <input type="checkbox" id="emailNotifications" ${this.state.settings.emailNotifications ? 'checked' : ''}>
-              알림 받기
-            </label>
-            <input type="email" id="userEmail" placeholder="이메일" value="${this.state.settings.userEmail || ''}">
-            
-            <div class="email-days-section ${this.state.settings.emailNotifications ? 'visible' : 'hidden'}">
-              <h5>알림 요일</h5>
-              <div class="days-selector">
-                ${['일', '월', '화', '수', '목', '금', '토'].map((day, index) => `
-                  <button type="button" class="day-btn ${(this.state.settings.emailDays || []).includes(index) ? 'selected' : ''}" 
-                          data-day="${index}">
-                    ${day}
-                  </button>
-                `).join('')}
-              </div>
-              
-              <div class="time-selector-section">
-                <h5>알림 시간</h5>
-                <div class="time-selector">
-                  <div class="time-presets">
-                    ${['09:00', '12:00', '18:00', '21:00'].map(time => `
-                      <button type="button" class="time-preset ${this.state.settings.emailTime === time ? 'selected' : ''}" 
-                              data-time="${time}">
-                        ${this.formatTimeDisplay(time)}
-                      </button>
-                    `).join('')}
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -1114,40 +1076,14 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
         modal.remove()
       } else if (e.target.id === 'saveSettings') {
         this.saveSettings(modal)
-      } else if (e.target.classList.contains('day-btn')) {
-        this.toggleDaySelection(e.target)
       } else if (e.target.classList.contains('period-option') || e.target.closest('.period-option')) {
         const button = e.target.classList.contains('period-option') ? e.target : e.target.closest('.period-option')
         this.togglePeriodSelection(button, modal)
-      } else if (e.target.classList.contains('time-preset')) {
-        this.selectTimePreset(e.target, modal)
       }
     })
 
-    // 이메일 알림 체크박스 변경 시 요일 섹션 표시/숨김
-    modal.addEventListener('change', e => {
-      if (e.target.id === 'emailNotifications') {
-        const daysSection = modal.querySelector('.email-days-section')
-        if (e.target.checked) {
-          daysSection.classList.remove('hidden')
-          daysSection.classList.add('visible')
-        } else {
-          daysSection.classList.remove('visible')
-          daysSection.classList.add('hidden')
-        }
-      }
-    })
   }
 
-  toggleDaySelection(button) {
-    button.classList.toggle('selected')
-  }
-
-  selectTimePreset(button, modal) {
-    // Clear other preset selections
-    modal.querySelectorAll('.time-preset').forEach(btn => btn.classList.remove('selected'))
-    button.classList.add('selected')
-  }
 
 
   togglePeriodSelection(button, modal) {
@@ -1180,9 +1116,7 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
       { id: 'week3', label: '3주일' },
       { id: 'month1', label: '1개월' },
       { id: 'month6', label: '6개월' },
-      { id: 'year1', label: '1년' },
-      { id: 'year3', label: '3년' },
-      { id: 'year3plus', label: '3년+' }
+      { id: 'year1', label: '1년 이상' }
     ]
 
     periods.forEach(period => {
@@ -1200,26 +1134,9 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
     }
   }
 
-  formatTimeDisplay(time) {
-    const [hour] = time.split(':')
-    const hourNum = parseInt(hour)
-    
-    if (hourNum === 9) return '오전 9시'
-    if (hourNum === 12) return '정오 12시'
-    if (hourNum === 18) return '오후 6시'
-    if (hourNum === 21) return '오후 9시'
-    
-    if (hourNum < 12) {
-      return `오전 ${hourNum}시`
-    } else if (hourNum === 12) {
-      return '정오 12시'
-    } else {
-      return `오후 ${hourNum - 12}시`
-    }
-  }
 
   saveSettings(modal) {
-    const periodIds = ['week1', 'week2', 'week3', 'month1', 'month6', 'year1', 'year3', 'year3plus']
+    const periodIds = ['week1', 'week2', 'week3', 'month1', 'month6', 'year1']
     const newSettings = {}
     
     // 모든 기간 설정 처리 (새로운 UI에서 선택된 것들)
@@ -1231,18 +1148,6 @@ JSON 형식으로 응답해주세요: {"bookmark_id": "category"}`
       }
     })
     
-    // 기타 설정
-    newSettings.emailNotifications = document.getElementById('emailNotifications').checked
-    
-    // 선택된 알림 요일 수집
-    const selectedDays = Array.from(modal.querySelectorAll('.day-btn.selected')).map(btn => 
-      parseInt(btn.dataset.day)
-    )
-    newSettings.emailDays = selectedDays
-    
-    // 알림 시간 설정 (선택된 프리셋에서)
-    const selectedTimePreset = modal.querySelector('.time-preset.selected')
-    newSettings.emailTime = selectedTimePreset ? selectedTimePreset.dataset.time : '09:00'
     
     chrome.runtime.sendMessage({ action: 'updateSettings', settings: newSettings }, async response => {
       if (response?.success) {
