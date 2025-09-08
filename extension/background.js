@@ -9,20 +9,20 @@ const SEARCH_ENGINE_DOMAINS = [
   'yandex.com', 'search.yahoo.co.jp'
 ]
 
-// 기간별 설정 (기본값: 모두 비활성화)
+// 기간별 설정 (기본값: 1일 활성화)
 const DEFAULT_SETTINGS = {
-  week1: { enabled: false, days: 7, label: '1주일' },
-  week2: { enabled: false, days: 14, label: '2주일' }, 
-  week3: { enabled: false, days: 21, label: '3주일' },
+  week1: { enabled: true, days: 7, label: '1주' },
+  week2: { enabled: false, days: 14, label: '2주' },
   month1: { enabled: false, days: 30, label: '1개월' },
   month6: { enabled: false, days: 180, label: '6개월' },
-  year1: { enabled: false, days: 9999, label: '1년 이상' }
+  year1: { enabled: false, days: 365, label: '1년' },
+  year2: { enabled: false, days: 730, label: '2년 이상' }
 }
 
 // 초기화
 if (chrome.runtime && chrome.runtime.onInstalled) {
   chrome.runtime.onInstalled.addListener(() => {
-    console.log('북마크 보관소 설치 완료!')
+    console.log('북마크 청소부 설치 완료!')
     createGraveyardFolder()
     initializeSettings()
     setupPeriodicFolderCheck()
@@ -188,7 +188,7 @@ async function scanBookmarks() {
     
     // 활성화된 기간별로 북마크 분류
     const periods = Object.entries(cleanupSettings).filter(([key, setting]) => 
-      (key.startsWith('week') || key.startsWith('month') || key.startsWith('year')) && setting.enabled
+      (key.startsWith('week') || key.startsWith('month') || key.startsWith('year') || key === 'custom') && setting.enabled
     )
     
     if (periods.length === 0) {
@@ -243,24 +243,31 @@ async function scanBookmarks() {
           return
         }
 
-        const result = await chrome.storage.local.get([`lastVisit_${node.id}`, `dateAdded_${node.id}`])
+        const result = await chrome.storage.local.get([`lastVisit_${node.id}`])
         const lastVisit = result[`lastVisit_${node.id}`] || node.dateAdded || 0
-        const dateAdded = result[`dateAdded_${node.id}`] || node.dateAdded || now
         
-        // 각 기간별로 체크
+        // 각 기간별로 체크 (마지막 방문일 기준)
         for (const [periodKey, setting] of periods) {
-          const threshold = setting.days * 24 * 60 * 60 * 1000
-          const daysSinceAdded = (now - dateAdded) / (24 * 60 * 60 * 1000)
           const daysSinceVisit = (now - lastVisit) / (24 * 60 * 60 * 1000)
           
-          if (daysSinceAdded >= setting.days && daysSinceVisit >= setting.days) {
+          let isInRange = false
+          
+          if (periodKey === 'custom') {
+            // 커스텀 범위 체크
+            isInRange = daysSinceVisit >= setting.minDays && daysSinceVisit <= setting.maxDays
+          } else {
+            // 기존 로직: 1주 옵션은 0일부터, 다른 옵션들은 설정된 기간 이상
+            const thresholdDays = (periodKey === 'week1') ? 0 : setting.days
+            isInRange = daysSinceVisit >= thresholdDays
+          }
+          
+          if (isInRange) {
             bookmarksToProcess.push({
               ...node,
               period: setting.label,
-              daysSinceAdded: Math.floor(daysSinceAdded),
               daysSinceVisit: Math.floor(daysSinceVisit),
-              dateAdded: dateAdded, // 저장일 정보 포함
-              category: categorizeBookmark(node) // 카테고리 분류 추가
+              lastVisit: lastVisit,
+              category: categorizeBookmark(node)
             })
             break
           }
@@ -359,6 +366,14 @@ if (chrome.runtime && chrome.runtime.onMessage) {
       .then(result => sendResponse({ settings: result.cleanupSettings || DEFAULT_SETTINGS }))
       .catch(err => sendResponse({ settings: DEFAULT_SETTINGS }))
     return true
+  } else if (request.action === 'getBookmarkDistribution') {
+    getBookmarkDistribution()
+      .then(distribution => sendResponse({ distribution }))
+      .catch(err => {
+        console.error('Error getting bookmark distribution:', err)
+        sendResponse({ distribution: {} })
+      })
+    return true
   }
   })
 }
@@ -402,6 +417,61 @@ async function copyBookmarksToGraveyard(bookmarks) {
   }
 }
 
+
+// 북마크 분포 데이터 계산
+async function getBookmarkDistribution() {
+  try {
+    const { graveyardId } = await chrome.storage.local.get('graveyardId')
+    const bookmarks = await chrome.bookmarks.getTree()
+    const now = Date.now()
+    const distribution = {}
+    
+    // 0일부터 730일(2년)까지 1일 단위로 분포 계산
+    for (let day = 0; day <= 730; day++) {
+      distribution[day] = 0
+    }
+    
+    async function analyzeBookmark(node) {
+      if (node.url && node.parentId !== graveyardId) {
+        // 검색엔진 사이트는 제외
+        if (SEARCH_ENGINE_DOMAINS.some(domain => {
+          try {
+            return new URL(node.url).hostname.toLowerCase().includes(domain)
+          } catch {
+            return false
+          }
+        })) {
+          return
+        }
+        
+        const result = await chrome.storage.local.get([`lastVisit_${node.id}`])
+        const lastVisit = result[`lastVisit_${node.id}`] || node.dateAdded || 0
+        const daysSinceVisit = Math.floor((now - lastVisit) / (24 * 60 * 60 * 1000))
+        
+        // 2년 이내의 데이터만 포함
+        if (daysSinceVisit >= 0 && daysSinceVisit <= 730) {
+          distribution[daysSinceVisit]++
+        }
+      }
+      
+      if (node.children) {
+        for (const child of node.children) {
+          await analyzeBookmark(child)
+        }
+      }
+    }
+    
+    // 북마크 분석
+    for (const child of bookmarks[0].children) {
+      await analyzeBookmark(child)
+    }
+    
+    return distribution
+  } catch (error) {
+    console.error('Error calculating bookmark distribution:', error)
+    return {}
+  }
+}
 
 async function getStats() {
   try {

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "북마크 보관소",
+  "name": "북마크 청소부",
   "version": "1.0.0",
-  "description": "30일 이상 방문하지 않은 북마크를 자동으로 정리합니다",
+  "description": "사용하지 않는 북마크를 깔끔하게 정리해주는 북마크 청소 도구",
   "permissions": [
     "bookmarks",
     "storage",
@@ -19,7 +19,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "북마크 보관소"
+    "default_title": "북마크 청소부"
   },
   "icons": {
     "16": "icon.png",
